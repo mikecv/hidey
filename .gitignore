@@ -1,0 +1,9 @@
+# Ignore code workspace.
+*.code-workspace
+
+# Ignore target builds.
+/target
+
+# Ignore log files.
+/logs
+/logs/*.log
