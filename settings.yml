@@ -1,0 +1,4 @@
+# Version information.
+settings_version:   0.1.0
+# Code embedding settings.
+max_embed_ratio:    0.5
