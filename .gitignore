@@ -7,3 +7,6 @@
 # Ignore log files.
 /logs
 /logs/*.log
+
+# Ignore image files.
+/images

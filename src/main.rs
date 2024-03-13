@@ -30,5 +30,9 @@ fn main() {
     info!("Application settings loaded, version: {}", settings.settings_version);
 
     // Instatiate a steganography struct.
-    let mut _img_steg = Steganography::init(settings);
+    let mut img_steg = Steganography::init(settings);
+
+    // Testing for addtions to Steganography struct.
+    img_steg.init_embed_params();
+    img_steg.load_new_file("volleyballss.png".to_string())
 }
