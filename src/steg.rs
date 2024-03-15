@@ -18,6 +18,9 @@ pub struct Steganography {
     pub pic_coded: bool,
     pub pic_password: bool,
     pub pic_code_name_len: u8,
+    pub pic_width: u32,
+    pub pic_height: u32,
+    pub pic_col_planes: u8,
     pub row: u16,
     pub col: u16,
     pub plane: u8,
@@ -45,6 +48,9 @@ impl Steganography {
             pic_coded: false,
             pic_password: false,
             pic_code_name_len: 0,
+            pic_width: 0,
+            pic_height: 0,
+            pic_col_planes: 0,
             row: 0,
             col: 0,
             plane: 0,
@@ -70,6 +76,9 @@ impl Steganography {
         self.pic_coded = false;
         self.pic_password = false;
         self.pic_code_name_len = 0;
+        self.pic_width = 0;
+        self.pic_height = 0;
+        self.pic_col_planes = 0;
     }
 }
 
@@ -98,7 +107,18 @@ impl Steganography {
     pub fn load_new_file(&mut self, in_file:String) {
         // Do image intialisatioins to clean up after any
         // successful or failed image loading.
+        // That is, parameters for loaded and imbedded image.
         self.init_image_params();
+        self.init_embed_params();
+
+        // Several checks along the way so status
+        // to keep progress along the way.
+        let cont_ckh: bool = true;
+
+        // Get the image type.
+        // Only support PGN image types.
+        // <TODO>
+
 
         // Create path to image.
         let mut img_path = PathBuf::new();
@@ -135,13 +155,24 @@ impl Steganography {
         };
 
         // Get image dimensions
-        let (width, height) = img.dimensions();
-        let color_planes = img.color();
+        (self.pic_width, self.pic_height) = img.dimensions();
 
-        // Print image parameters
-        println!("Image Width: {}", width);
-        println!("Image Height: {}", height);
-        println!("Color planes: {:?}", color_planes);
+        // Print image size parameters.
+        info!("Image loaded with width: {}, height: {}", self.pic_width, self.pic_height);
 
+        // Get number of colour planes.
+        // On supporting Rgb8 or Rgba8.
+        let cols = img.color();
+        match cols {
+            image::ColorType::Rgb8 | image::ColorType::Rgba8 => {
+                // Store number of colour planes.
+                self.pic_col_planes = 3;
+                info!("Image loaded with colour planes: {}", self.pic_col_planes);
+            }
+            _ => {
+                // Unsopported image colour type.
+                info!("Image not a supported rgb colour type.");
+            }
+        }
     }
 }

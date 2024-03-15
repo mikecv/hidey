@@ -34,5 +34,5 @@ fn main() {
 
     // Testing for addtions to Steganography struct.
     img_steg.init_embed_params();
-    img_steg.load_new_file("volleyballss.png".to_string())
+    img_steg.load_new_file("volleyballs.png".to_string())
 }
