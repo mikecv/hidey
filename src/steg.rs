@@ -173,5 +173,43 @@ impl Steganography {
                 }
             }
         }
+
+        // Calcaulate the available space for storage.
+        // Basically how many bits get used when embeddng files
+        // in an image.
+        // Here capacity is in bytes.
+        if cont_ckh == true {
+            let img_bytes: u32 = self.pic_width * self.pic_height * self.pic_col_planes as u32;
+            let _embed_bytes: f32 = img_bytes as f32 * self.settings.max_embed_ratio;
+            self.embed_capacity = _embed_bytes as u32;
+
+            info!("Approx embedding capacity (bytes): {}", self.embed_capacity);
+        }
+
+        // Check if the file is already image coded.
+        self.check_for_code();
+        if self.pic_coded == true {
+            info!("Image file contains preamble code.");
+        }
+    }
+}
+
+// Method to check if image has been previousl encoded,
+// that is, it contains the preable code.
+impl Steganography {
+    pub fn check_for_code(&mut self) {
+        // First check if file is even large enough to hold a code.
+        // Can do this by checking emdedding capacity.
+        if self.embed_capacity < self.settings.min_capacity {
+            warn!("Capacity less than min for coding (bytes): {}", self.embed_capacity);
+            self.pic_coded = false;
+            return
+        }
+
+        // File largge enough to hold preamble code.
+        // Extract data from image and match with code.
+        //<ToDo>
+    
+        self.pic_coded = true;
     }
 }
