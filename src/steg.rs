@@ -4,7 +4,7 @@ extern crate image;
 
 use log::{error, info, warn};
 use std::path::PathBuf;
-use image::{GenericImageView, DynamicImage, Rgb, RgbImage};
+use image::GenericImageView;
 
 use crate::settings::Settings;
 
@@ -113,22 +113,16 @@ impl Steganography {
 
         // Several checks along the way so status
         // to keep progress along the way.
-        let cont_ckh: bool = true;
-
-        // Get the image type.
-        // Only support PGN image types.
-        // <TODO>
-
+        let mut cont_ckh: bool = true;
 
         // Create path to image.
         let mut img_path = PathBuf::new();
         img_path.push("images");        
         img_path.push(in_file.clone());
-
         let img_path_string = img_path.to_string_lossy().into_owned();
         self.image_file = img_path_string;
 
-        let img_result = image::open(img_path);
+        let img_result = image::open(&img_path);
         // Handle exceptions, specific like file not found, and generic.
         let img = match img_result {
             Ok(img) => {
@@ -137,6 +131,9 @@ impl Steganography {
                 img
             }
             Err(err) => {
+                // Set flag indicating that there was an issue opening the file.
+                // So we don't have to continue after this.
+                cont_ckh = false;
                 match err {
                     // File not found error.
                     image::ImageError::IoError(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => {
@@ -154,24 +151,26 @@ impl Steganography {
             }
         };
 
-        // Get image dimensions
-        (self.pic_width, self.pic_height) = img.dimensions();
+        // If we have an image file open, then read the parameters.
+        // Need to check if 3 colour  planes as well.
+        if cont_ckh == true {
+            // Get image width and height
+            (self.pic_width, self.pic_height) = img.dimensions();
+            info!("Image loaded with width: {}, height: {}", self.pic_width, self.pic_height);
 
-        // Print image size parameters.
-        info!("Image loaded with width: {}, height: {}", self.pic_width, self.pic_height);
-
-        // Get number of colour planes.
-        // On supporting Rgb8 or Rgba8.
-        let cols = img.color();
-        match cols {
-            image::ColorType::Rgb8 | image::ColorType::Rgba8 => {
-                // Store number of colour planes.
-                self.pic_col_planes = 3;
-                info!("Image loaded with colour planes: {}", self.pic_col_planes);
-            }
-            _ => {
-                // Unsopported image colour type.
-                info!("Image not a supported rgb colour type.");
+            // Need to check if color format is acceptable.
+            // Need 3 color planes.
+            let cols = img.color();
+            match cols {
+                image::ColorType::Rgb8 | image::ColorType::Rgba8 => {
+                    // Store number of color planes
+                    self.pic_col_planes = 3;
+                    info!("Image loaded with colour planes: {}", self.pic_col_planes);
+                }
+                _ => {
+                    // Unsupported image color type
+                    info!("Image not a supported rgb colour type.");
+                }
             }
         }
     }
