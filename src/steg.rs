@@ -27,6 +27,7 @@ pub struct Steganography {
     pub bit: u8,
     pub bytes_read: u32,
     pub bytes_written: u32,
+    pub code_bytes: Vec<u8>,
     pub embedded_file_path: String,
     pub embedded_file_name: String,
     pub embedded_file_size: u32,
@@ -57,6 +58,7 @@ impl Steganography {
             bit: 0,
             bytes_read: 0,
             bytes_written: 0,
+            code_bytes: Vec::with_capacity(0),
             embedded_file_path: String::from(""),
             embedded_file_name: String::from(""),
             embedded_file_size: 0,
@@ -208,8 +210,65 @@ impl Steganography {
 
         // File largge enough to hold preamble code.
         // Extract data from image and match with code.
-        //<ToDo>
-    
-        self.pic_coded = true;
+        // Read number of bytes for the pic code.
+        let bytes_to_read:u32 = self.settings.prog_code.len().try_into().unwrap();
+        self.read_data_from_image(bytes_to_read);
+        if self.bytes_read != bytes_to_read {
+            error!("Expected bytes: {}, bytes read: {}", bytes_to_read, self.bytes_read);
+            info!("Image file is not pic coded.");  
+            self.pic_coded = false;         
+        }
+        else {
+            // Compare the byte array read with the pic coded array (string).
+            let string_result = String::from_utf8((&*self.code_bytes).to_vec());
+            match string_result {
+                Ok(string) => {
+                    // String read so need to see if it matches the code.
+                    if string == self.settings.prog_code {
+                        info!("Image is pic coded.");
+                    }
+                    else {
+                        info!("Image is not pic coded.");
+                        self.pic_coded = false;         
+                    }
+                }
+                Err(e) => {
+                    warn!("Warning, error converting to string: {}", e);
+                    self.pic_coded = false;         
+                }
+            }
+        }
+    }
+}
+
+// Method to certain number of bytes from image..
+impl Steganography {
+    pub fn read_data_from_image(&mut self, bytes_to_read:u32) {
+        info!("Reading bytes from image: {}", bytes_to_read);
+
+        // Initial loop counters.
+        let mut bytes_read:u32 = 0;
+        let row_cnt:u16 = self.row;
+        let col_cnt:u16 = self.col;
+        let col_plane:u8 = self.plane;
+        let bits_read:u8 = self.bit;
+
+        // Temp for now.
+        self.code_bytes = Vec::with_capacity(bytes_to_read as usize);
+        self.code_bytes.push(b'P');
+        self.code_bytes.push(b'I');
+        self.code_bytes.push(b'C');
+        self.code_bytes.push(b'C');
+        self.code_bytes.push(b'O');
+        self.code_bytes.push(b'D');
+        self.code_bytes.push(b'E');
+        self.code_bytes.push(b'R');
+        bytes_read = 8;
+
+        self.row = row_cnt;
+        self.col = col_cnt;
+        self.plane = col_plane;
+        self.bit = bits_read;
+        self.bytes_read = bytes_read;
     }
 }
