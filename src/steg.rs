@@ -4,7 +4,7 @@ extern crate image;
 
 use log::{error, info, warn};
 use std::path::PathBuf;
-use image::GenericImageView;
+use image::{DynamicImage, GenericImageView, Pixel};
 
 use crate::settings::Settings;
 
@@ -15,15 +15,16 @@ pub struct Steganography {
     pub img_to_proc: bool,
     pub img_proc_running: bool,
     pub image_file: String,
+    pub image: Option<DynamicImage>,
     pub pic_coded: bool,
     pub pic_password: bool,
     pub pic_code_name_len: u8,
     pub pic_width: u32,
     pub pic_height: u32,
     pub pic_col_planes: u8,
-    pub row: u16,
-    pub col: u16,
-    pub plane: u8,
+    pub row: u32,
+    pub col: u32,
+    pub plane: usize,
     pub bit: u8,
     pub bytes_read: u32,
     pub bytes_written: u32,
@@ -46,6 +47,7 @@ impl Steganography {
             img_to_proc: false,
             img_proc_running: false,
             image_file: String::from(""),
+            image: None,
             pic_coded: false,
             pic_password: false,
             pic_code_name_len: 0,
@@ -74,6 +76,7 @@ impl Steganography {
     pub fn init_image_params(&mut self) {
         info!("Initialising load image file parameters.");
         self.image_file = String::from("");
+        self.image = None;
         self.img_to_proc = false;
         self.pic_coded = false;
         self.pic_password = false;
@@ -126,11 +129,12 @@ impl Steganography {
 
         let img_result = image::open(&img_path);
         // Handle exceptions, specific like file not found, and generic.
-        let img = match img_result {
-            Ok(img) => {
+        let _img = match img_result {
+            Ok(_img) => {
                 // Set flag to indicate we have an image to process.
                 self.img_to_proc = true;
-                img
+                self.image = Some(_img.clone());
+                _img
             }
             Err(err) => {
                 // Set flag indicating that there was an issue opening the file.
@@ -139,6 +143,7 @@ impl Steganography {
                 match err {
                     // File not found error.
                     image::ImageError::IoError(io_err) if io_err.kind() == std::io::ErrorKind::NotFound => {
+
                         warn!("Warning file not found: {}", in_file.clone());
                         // Return a placeholder image.
                         image::DynamicImage::new_rgb8(1, 1)
@@ -156,23 +161,35 @@ impl Steganography {
         // If we have an image file open, then read the parameters.
         // Need to check if 3 colour  planes as well.
         if cont_ckh == true {
-            // Get image width and height
-            (self.pic_width, self.pic_height) = img.dimensions();
-            info!("Image loaded with width: {}, height: {}", self.pic_width, self.pic_height);
+            if let Some(image) = &self.image {
+                // Get image width and height
+                (self.pic_width, self.pic_height) = image.dimensions();
+                info!("Image loaded with width: {}, height: {}", self.pic_width, self.pic_height);
 
-            // Need to check if color format is acceptable.
-            // Need 3 color planes.
-            let cols = img.color();
-            match cols {
-                image::ColorType::Rgb8 | image::ColorType::Rgba8 => {
-                    // Store number of color planes
-                    self.pic_col_planes = 3;
-                    info!("Image loaded with colour planes: {}", self.pic_col_planes);
+                // Need to check if color format is acceptable.
+                // Need 3 color planes.
+                let cols = image.color();
+                match cols {
+                    // Even though only writing to rgb planes for now,
+                    // Need to keep track if there is a transparency layer.
+                    image::ColorType::Rgb8 => {
+                        // Store number of color planes
+                        self.pic_col_planes = 3;
+                        info!("Image loaded with colour planes: {}", self.pic_col_planes);
+                    }
+                    image::ColorType::Rgba8 => {
+                        // Store number of color planes
+                        self.pic_col_planes = 4;
+                        info!("Image loaded with colour planes: {}", self.pic_col_planes);
+                    }
+                    _ => {
+                        // Unsupported image color type
+                        info!("Image not a supported rgb colour type.");
+                    }
                 }
-                _ => {
-                    // Unsupported image color type
-                    info!("Image not a supported rgb colour type.");
-                }
+            }
+            else {
+                error!("Image is of None type");
             }
         }
 
@@ -208,7 +225,7 @@ impl Steganography {
             return
         }
 
-        // File largge enough to hold preamble code.
+        // File large enough to hold preamble code.
         // Extract data from image and match with code.
         // Read number of bytes for the pic code.
         let bytes_to_read:u32 = self.settings.prog_code.len().try_into().unwrap();
@@ -216,7 +233,8 @@ impl Steganography {
         if self.bytes_read != bytes_to_read {
             error!("Expected bytes: {}, bytes read: {}", bytes_to_read, self.bytes_read);
             info!("Image file is not pic coded.");  
-            self.pic_coded = false;         
+            self.pic_coded = false;
+            return;
         }
         else {
             // Compare the byte array read with the pic coded array (string).
@@ -226,49 +244,115 @@ impl Steganography {
                     // String read so need to see if it matches the code.
                     if string == self.settings.prog_code {
                         info!("Image is pic coded.");
+
+                        // Image file is pic coded,
+                        // So we can extract the data from it.
+                        // <TODO>
+                        // Need to check if there is a password.
+                        // Need to prompt for a password if applicable
+                        // Need to check how many files are embedded,
+                        // Need to extract and save embedded files.
                     }
                     else {
                         info!("Image is not pic coded.");
-                        self.pic_coded = false;         
+                        self.pic_coded = false;
+                        return;
                     }
                 }
                 Err(e) => {
                     warn!("Warning, error converting to string: {}", e);
-                    self.pic_coded = false;         
+                    self.pic_coded = false;
+                    return;
                 }
             }
         }
     }
 }
 
-// Method to certain number of bytes from image..
+// Method to read a certain number of bytes from image..
 impl Steganography {
     pub fn read_data_from_image(&mut self, bytes_to_read:u32) {
         info!("Reading bytes from image: {}", bytes_to_read);
 
         // Initial loop counters.
         let mut bytes_read:u32 = 0;
-        let row_cnt:u16 = self.row;
-        let col_cnt:u16 = self.col;
-        let col_plane:u8 = self.plane;
-        let bits_read:u8 = self.bit;
+        let mut row_cnt:u32 = self.row;
+        let mut col_cnt:u32 = self.col;
+        let mut col_plane:usize = self.plane;
+        let mut _bits_read:u8 = self.bit;
+        let mut _col_part:u8 = 0;
+        let mut _code_data:u8 = 0;
+        let mut _byte_bit:u8 = 0;
+        let mut _mask:u8 = 0;
 
-        // Temp for now.
+        // Initialise byte vector for read data.
         self.code_bytes = Vec::with_capacity(bytes_to_read as usize);
-        self.code_bytes.push(b'P');
-        self.code_bytes.push(b'I');
-        self.code_bytes.push(b'C');
-        self.code_bytes.push(b'C');
-        self.code_bytes.push(b'O');
-        self.code_bytes.push(b'D');
-        self.code_bytes.push(b'E');
-        self.code_bytes.push(b'R');
-        bytes_read = 8;
 
+        // Initialise a colour bit mask.
+        // This is so we can read an individual
+        // bit in a pixel colour byte.
+        _mask = 1 << _bits_read;
+
+        // Loop while there are still bytes to read.
+        while bytes_read < bytes_to_read {
+            _code_data = 0;
+
+            // Extract 1 byte of data from image.,
+            // one bit at a time.
+            for _idx in 1..8 {
+                // Get the pixel colour for the pixel we are at.
+                if let Some(image) = &self.image {
+                    if self.pic_col_planes == 3 { 
+                        _col_part = image.get_pixel(col_cnt, row_cnt).to_rgb()[col_plane];
+                    } else {
+                        _col_part = image.get_pixel(col_cnt, row_cnt).to_rgba()[col_plane];
+                    }
+                }
+
+                // Update the code data bit with the bit from the pixel.
+                _byte_bit = _col_part & _mask;
+                _byte_bit = _byte_bit >> _bits_read;
+                _code_data = _code_data << 1;
+                _code_data = _code_data | _byte_bit;
+
+                // Next time around we need to point to the next pixel in the row.
+                col_cnt = col_cnt + 1;
+                // Until we get to the end of the row.
+                // Then more to the start of the next row.
+                if col_cnt == self.pic_width {
+                    col_cnt = 0;
+                    row_cnt = row_cnt + 1;
+                    // If we have reached the end of the image then go
+                    // back to the top and go to the text bit.
+                    if row_cnt == self.pic_height {
+                        row_cnt = 0;
+                        col_plane = col_plane + 1;
+                        // If we have processed the last plane (colour)
+                        // We go back to the next bit of the first plane,
+                        if col_plane == 3 {
+                            col_plane = 0;
+                            _bits_read = _bits_read + 1;
+                            _mask = _mask << 1;
+                        }
+                    }
+                }
+            }
+            // Push the completed byte into the byte vector.
+            self.code_bytes.push(_code_data);
+
+            // <TODO>
+            // Remove this line after testing.
+            println!("Bytes read: {}",_code_data);
+            
+            // Increment bytes read.
+            bytes_read = bytes_read + 1;
+        }
+
+        // Save the state of the reading.
         self.row = row_cnt;
         self.col = col_cnt;
         self.plane = col_plane;
-        self.bit = bits_read;
+        self.bit = _bits_read;
         self.bytes_read = bytes_read;
     }
 }
