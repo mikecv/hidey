@@ -299,7 +299,7 @@ impl Steganography {
 
             // Extract 1 byte of data from image.,
             // one bit at a time.
-            for _idx in 1..8 {
+            for _idx in 1..9 {
                 // Get the pixel colour for the pixel we are at.
                 if let Some(image) = &self.image {
                     if self.pic_col_planes == 3 { 
@@ -340,10 +340,6 @@ impl Steganography {
             // Push the completed byte into the byte vector.
             self.code_bytes.push(_code_data);
 
-            // <TODO>
-            // Remove this line after testing.
-            println!("Bytes read: {}",_code_data);
-            
             // Increment bytes read.
             bytes_read = bytes_read + 1;
         }
