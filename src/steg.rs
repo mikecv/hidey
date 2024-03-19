@@ -1,4 +1,24 @@
-//Steganography data structure and methods.
+// Steganography data structure and methods.
+//
+// Steganography in this application is embedding files in lossless images,
+// specifically in PNG format images.
+// Supported formats are rgb and rgb colour formats,although only
+// the rgb colour bytes are used to encode data into.
+//
+// A pic coded image contains a particular 8 byte string embedded in the image.
+// Here 'contains' implies embedded in the image colour bytes.
+// The format of pic coded files is as follows:
+//
+// Pic coded signature : 8 bytes
+// Password enabled : 1 byte, 'Y' or 'N'
+// If password enabled : 30 byte hash of password.
+// Number of files embedded : 2 digit integer, leading zeros.
+// For each file section the following applies:
+//
+// File name length: 2 digit integer, leading zeros.
+// File name : file name string in file name length bytes.
+// File length in bytes : 8 digit integer, leading zeros.
+// File contents : file bytes in file length bytes.
 
 extern crate image;
 
