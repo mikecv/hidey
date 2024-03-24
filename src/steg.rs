@@ -20,11 +20,19 @@
 // File length in bytes : 8 digit integer, leading zeros.
 // File contents : file bytes in file length bytes.
 
+pub mod image_read;
+pub mod image_write;
+
 extern crate image;
+extern crate ring;
 
 use log::{error, info, warn};
+
+use std::fs;
+use std::io;
 use std::path::PathBuf;
-use image::{DynamicImage, GenericImageView, Pixel};
+use image::{DynamicImage, GenericImageView};
+use ring::digest;
 
 use crate::settings::Settings;
 
@@ -37,7 +45,8 @@ pub struct Steganography {
     pub image_file: String,
     pub image: Option<DynamicImage>,
     pub pic_coded: bool,
-    pub pic_password: bool,
+    pub user_permit: bool,
+    pub pic_has_pw: bool,
     pub pic_code_name_len: u8,
     pub pic_width: u32,
     pub pic_height: u32,
@@ -54,7 +63,7 @@ pub struct Steganography {
     pub embedded_file_size: u32,
     pub to_embed_file_path: String,
     pub to_embed_file_size: u32,
-    pub embed_capacity: u32,
+    pub embed_capacity: u64,
 }
 
 // Initialise all struct variables.
@@ -69,7 +78,8 @@ impl Steganography {
             image_file: String::from(""),
             image: None,
             pic_coded: false,
-            pic_password: false,
+            user_permit: false,
+            pic_has_pw: false,
             pic_code_name_len: 0,
             pic_width: 0,
             pic_height: 0,
@@ -99,11 +109,13 @@ impl Steganography {
         self.image = None;
         self.img_to_proc = false;
         self.pic_coded = false;
-        self.pic_password = false;
+        self.user_permit = false;
+        self.pic_has_pw = false;
         self.pic_code_name_len = 0;
         self.pic_width = 0;
         self.pic_height = 0;
         self.pic_col_planes = 0;
+        self.embed_capacity = 0;
     }
 }
 
@@ -123,7 +135,6 @@ impl Steganography {
         self.embedded_file_size = 0;
         self.to_embed_file_path = String::from("");
         self.to_embed_file_size = 0;
-        self.embed_capacity = 0;
     }
 }
 
@@ -213,22 +224,27 @@ impl Steganography {
             }
         }
 
-        // Calcaulate the available space for storage.
+        // Calculate the available space for storage.
         // Basically how many bits get used when embeddng files
         // in an image.
         // Here capacity is in bytes.
         if cont_ckh == true {
             let img_bytes: u32 = self.pic_width * self.pic_height * self.pic_col_planes as u32;
             let _embed_bytes: f32 = img_bytes as f32 * self.settings.max_embed_ratio;
-            self.embed_capacity = _embed_bytes as u32;
+            self.embed_capacity = _embed_bytes as u64;
 
             info!("Approx embedding capacity (bytes): {}", self.embed_capacity);
         }
 
-        // Check if the file is already image coded.
+        // Check if the file is already pic coded.
         self.check_for_code();
         if self.pic_coded == true {
             info!("Image file contains preamble code.");
+
+            // Now that we know that the image is pic coded,
+            // we can see if there is a password encoded in the image.
+            // Password yes or no is in the next 1 byte.
+            self.check_for_password();
         }
     }
 }
@@ -263,112 +279,151 @@ impl Steganography {
                 Ok(string) => {
                     // String read so need to see if it matches the code.
                     if string == self.settings.prog_code {
+                        self.pic_coded = true;
                         info!("Image is pic coded.");
-
-                        // Image file is pic coded,
-                        // So we can extract the data from it.
-                        // <TODO>
-                        // Need to check if there is a password.
-                        // Need to prompt for a password if applicable
-                        // Need to check how many files are embedded,
-                        // Need to extract and save embedded files.
                     }
                     else {
-                        info!("Image is not pic coded.");
                         self.pic_coded = false;
-                        return;
+                        info!("Image is not pic coded.");
                     }
                 }
-                Err(e) => {
-                    warn!("Warning, error converting to string: {}", e);
+                _ => {
                     self.pic_coded = false;
-                    return;
+                    info!("Image is not pic coded.");
                 }
             }
         }
     }
 }
 
-// Method to read a certain number of bytes from image..
+// Method to check if image has a password.
 impl Steganography {
-    pub fn read_data_from_image(&mut self, bytes_to_read:u32) {
-        info!("Reading bytes from image: {}", bytes_to_read);
+    pub fn check_for_password(&mut self) {
 
-        // Initial loop counters.
-        let mut bytes_read:u32 = 0;
-        let mut row_cnt:u32 = self.row;
-        let mut col_cnt:u32 = self.col;
-        let mut col_plane:usize = self.plane;
-        let mut _bits_read:u8 = self.bit;
-        let mut _col_part:u8 = 0;
-        let mut _code_data:u8 = 0;
-        let mut _byte_bit:u8 = 0;
-        let mut _mask:u8 = 0;
-
-        // Initialise byte vector for read data.
-        self.code_bytes = Vec::with_capacity(bytes_to_read as usize);
-
-        // Initialise a colour bit mask.
-        // This is so we can read an individual
-        // bit in a pixel colour byte.
-        _mask = 1 << _bits_read;
-
-        // Loop while there are still bytes to read.
-        while bytes_read < bytes_to_read {
-            _code_data = 0;
-
-            // Extract 1 byte of data from image.,
-            // one bit at a time.
-            for _idx in 1..9 {
-                // Get the pixel colour for the pixel we are at.
-                if let Some(image) = &self.image {
-                    if self.pic_col_planes == 3 { 
-                        _col_part = image.get_pixel(col_cnt, row_cnt).to_rgb()[col_plane];
-                    } else {
-                        _col_part = image.get_pixel(col_cnt, row_cnt).to_rgba()[col_plane];
+        // Read number of bytes for whether or not there is a password.
+        let bytes_to_read:u32 = 1;
+        self.read_data_from_image(bytes_to_read);
+        if self.bytes_read != bytes_to_read {
+            error!("Expected bytes: {}, bytes read: {}", bytes_to_read, self.bytes_read);
+            info!("Image does not include a password.");  
+            self.user_permit = false;
+            return;
+        }
+        else {
+            // Check for Y(es) or N(o) re password.
+            let string_result = String::from_utf8((&*self.code_bytes).to_vec());
+            match string_result {
+                Ok(string) => {
+                    // String read so need to see if it Y or N.
+                    if string == "Y" {
+                        self.pic_has_pw = true;
+                        info!("Image includes a password.");
                     }
                 }
-
-                // Update the code data bit with the bit from the pixel.
-                _byte_bit = _col_part & _mask;
-                _byte_bit = _byte_bit >> _bits_read;
-                _code_data = _code_data << 1;
-                _code_data = _code_data | _byte_bit;
-
-                // Next time around we need to point to the next pixel in the row.
-                col_cnt = col_cnt + 1;
-                // Until we get to the end of the row.
-                // Then more to the start of the next row.
-                if col_cnt == self.pic_width {
-                    col_cnt = 0;
-                    row_cnt = row_cnt + 1;
-                    // If we have reached the end of the image then go
-                    // back to the top and go to the text bit.
-                    if row_cnt == self.pic_height {
-                        row_cnt = 0;
-                        col_plane = col_plane + 1;
-                        // If we have processed the last plane (colour)
-                        // We go back to the next bit of the first plane,
-                        if col_plane == 3 {
-                            col_plane = 0;
-                            _bits_read = _bits_read + 1;
-                            _mask = _mask << 1;
-                        }
-                    }
+                _ => {
+                    self.pic_has_pw = false;
+                    info!("Image does not include a password.");
                 }
             }
-            // Push the completed byte into the byte vector.
-            self.code_bytes.push(_code_data);
-
-            // Increment bytes read.
-            bytes_read = bytes_read + 1;
         }
+    }
+}
 
-        // Save the state of the reading.
-        self.row = row_cnt;
-        self.col = col_cnt;
-        self.plane = col_plane;
-        self.bit = _bits_read;
-        self.bytes_read = bytes_read;
+// Method to check user's password entry.
+impl Steganography {
+    pub fn check_valid_password(&mut self, password: String) {
+        // Before checking the password we have to get the
+        // hashed password stored in the image.
+        // The password is a SHA-256 so always 32 bytes long.
+        let bytes_to_read:u32 = self.settings.pw_hash_len.into();
+        self.read_data_from_image(bytes_to_read);
+        if self.bytes_read != bytes_to_read {
+            error!("Expected bytes: {}, bytes read: {}", bytes_to_read, self.bytes_read);
+            info!("Image password invalid length.");  
+            self.user_permit = false;
+            return;
+        }
+        else {
+            // Check password against hash of user entry.
+            let string_result = String::from_utf8((&*self.code_bytes).to_vec());
+            match string_result {
+                Ok(string) => {
+                    // Check password against hash of user entry.
+                    let hashed_entry =  digest::digest(&digest::SHA256, password.as_bytes());
+                    let hashed_password = hashed_entry.as_ref();
+                    if string == std::str::from_utf8(hashed_password).unwrap() {
+                        self.user_permit = true;
+                        info!("User entered password matches.");
+                    }
+                    else {
+                        self.user_permit = false;
+                        info!("User entered password does not match.");
+                    }
+                }
+                _ => {
+                    self.user_permit = false;
+                    info!("User entered password does not match.");
+                }
+            }
+        }
+    }
+}
+
+// Method to embed one or more files into a loaded image.
+impl Steganography {
+    pub fn embed_files(&mut self, embed_files:&[&str]) -> io::Result<()> {
+        // Don't need to initialise image parameters as we require
+        // a loaded image to embed files into.
+        if self.img_to_proc == true {
+            // We have an image to embed into so all good.
+            // It doesn't matter if the image is already pic coded as we
+            // will just overwrite the previous embedding.
+            // We should also alaready know the embedding width, height,
+            // and embedding capacity of the image.
+
+            // First check is to see if there is space for the file(s) requested.
+            let mut bytes_to_embed = 0;
+            for file in embed_files {
+                // Need to get sum of file lengths to embed.
+                let metadata = fs::metadata(file)?;
+                let file_size = metadata.len();
+                bytes_to_embed = bytes_to_embed + file_size;
+                info!("File: {} Size: {} bytes", file, file_size);
+            }
+            // Need to see compare bytes to embed with image capacity.
+            // Ignoring size of file names as not significant.
+            if bytes_to_embed > self.embed_capacity {
+                // Exceeded embedding capacity so can't imbed.
+                warn!("Exceeded image emdedding: {}", self.embed_capacity)
+            }
+            else {
+                // Within the embedding capacity of the image, so proceed.
+                info!("Total data to embed: {} bytes", bytes_to_embed);
+
+                // First step is to write the pic code preamble to the file.
+                self.embed_preamble();
+            }
+            Ok(())
+        }
+        else {
+            println!("No files to process.");
+            Ok(())
+        }
+    }
+}
+
+// Method to add the preable code to the image.
+impl Steganography {
+    pub fn embed_preamble(&mut self) {
+        // Initialise embedding parameters.
+        self.init_embed_params();
+
+        // Send preample as bytes vector for embedding.
+        // All writes to the image is done in chunks.
+        let preamble_string = self.settings.prog_code.clone();
+        let preamble_bytes = preamble_string.as_bytes();
+        for chunk in preamble_bytes.chunks(self.settings.byte_chunk.try_into().unwrap()) {
+            self.write_data_to_image(chunk);
+        }
     }
 }

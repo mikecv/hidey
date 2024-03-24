@@ -32,7 +32,13 @@ fn main() {
     // Instatiate a steganography struct.
     let mut img_steg = Steganography::init(settings);
 
-    // Testing for addtions to Steganography struct.
+    // Testing Steganography struct and methods.
     img_steg.init_embed_params();
-    img_steg.load_new_file("Ei-beauty.png".to_string())
+    // Check if image is pic coded.
+    img_steg.load_new_file("volleyballs.png".to_string());
+    // Embed files into image.
+    let embed_files = vec!["/home/mike/hidey/images/kitten-grass.png", "/home/mike/hidey/images/kitten-in-basket.jpg"];
+    if let Err(err) = img_steg.embed_files(&embed_files) {
+        eprintln!("Error: {}", err);
+    }
 }
