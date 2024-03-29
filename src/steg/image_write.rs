@@ -2,7 +2,7 @@
 
 use crate::steg::Steganography;
 
-use log::info;
+use log::{info, warn};
 
 use image::{GenericImageView, Pixel};
 use crate::steg::image::GenericImage;
@@ -13,7 +13,8 @@ use crate::steg::image::GenericImage;
 // Expectation is that rgba documents will be converted to
 // rgb format before embedding data.
 impl Steganography {
-    pub fn write_data_to_image(&mut self, bytes:&[u8]) {
+    pub fn write_data_to_image(&mut self, bytes:&[u8]) -> u32 {
+        info!("Writing bytes to image: {}", bytes.len());
 
         // Initial loop counters.
         let mut bytes_written:u32 = 0;
@@ -21,6 +22,7 @@ impl Steganography {
         let mut col_cnt:u32 = self.col;
         let mut col_plane:usize = self.plane;
         let mut bit_write:u8 = self.bit;
+ 
         let mut col_part:image::Rgb<u8>;
         let mut _mask:u8 = 0;
         let mut _col_mask:u8 = 0;
@@ -29,9 +31,7 @@ impl Steganography {
         // Intialise colour bit mask.
         _col_mask = 1 << bit_write;
 
-        for byte in bytes {
-            info!("Processed byte: {}", byte);
-
+        for byte_data in bytes {
             // Mask for reading byte bits.
             // Start from MSB so in bit order in the image (assume 8 bit byte).
             _mask = 128;
@@ -40,7 +40,7 @@ impl Steganography {
             // one bit at a time.
             for _idx in 1..9 {
                 // Get next bit for byte in the array.
-                if (byte & _mask) == 0{
+                if (byte_data & _mask) == 0{
                     _mapped_bit = 0;
                 }
                 else {
@@ -53,9 +53,16 @@ impl Steganography {
                     col_part = img.get_pixel(col_cnt, row_cnt).to_rgb();
 
                     // Modify the colour plane component that we are up to.
-                    let r = col_part[0] & (! _col_mask);
-                    let g = col_part[1] & (! _col_mask);
-                    let b = col_part[2] & (! _col_mask);
+                    // First get all the colour parts
+                    let mut r = col_part[0];
+                    let mut g = col_part[1];
+                    let mut b = col_part[2];
+                    match col_plane {
+                        0 => {r = (r & (! _col_mask)) + _mapped_bit},
+                        1 => {g = (g & (! _col_mask)) + _mapped_bit},
+                        2 => {b = (b & (! _col_mask)) + _mapped_bit},
+                        _ => warn!("Unexpected colour plane."),
+                    }
 
                     // Update the pixel colour now that the colour component has been modified.
                     let modified_pixel = image::Rgba([r, g, b, 255]);
@@ -98,6 +105,9 @@ impl Steganography {
         self.col = col_cnt;
         self.plane = col_plane;
         self.bit = bit_write;
-        self.bytes_written = bytes_written;
+
+        // Return the number of bytes written for
+        // comparison by caller.
+        return bytes_written;
     }
 }

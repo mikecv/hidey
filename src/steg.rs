@@ -56,7 +56,6 @@ pub struct Steganography {
     pub plane: usize,
     pub bit: u8,
     pub bytes_read: u32,
-    pub bytes_written: u32,
     pub code_bytes: Vec<u8>,
     pub embedded_file_path: String,
     pub embedded_file_name: String,
@@ -89,7 +88,6 @@ impl Steganography {
             plane: 0,
             bit: 0,
             bytes_read: 0,
-            bytes_written: 0,
             code_bytes: Vec::with_capacity(0),
             embedded_file_path: String::from(""),
             embedded_file_name: String::from(""),
@@ -129,7 +127,6 @@ impl Steganography {
         self.plane = 0;
         self.bit = 0;
         self.bytes_read = 0;
-        self.bytes_written = 0;
         self.embedded_file_path = String::from("");
         self.embedded_file_name = String::from("");
         self.embedded_file_size = 0;
@@ -390,8 +387,8 @@ impl Steganography {
                 bytes_to_embed = bytes_to_embed + file_size;
                 info!("File: {} Size: {} bytes", file, file_size);
             }
-            // Need to see compare bytes to embed with image capacity.
-            // Ignoring size of file names as not significant.
+            // Need to compare bytes to embed with image capacity.
+            // Ignoring size of file names as not likely to be significant.
             if bytes_to_embed > self.embed_capacity {
                 // Exceeded embedding capacity so can't imbed.
                 warn!("Exceeded image emdedding: {}", self.embed_capacity)
@@ -423,7 +420,17 @@ impl Steganography {
         let preamble_string = self.settings.prog_code.clone();
         let preamble_bytes = preamble_string.as_bytes();
         for chunk in preamble_bytes.chunks(self.settings.byte_chunk.try_into().unwrap()) {
-            self.write_data_to_image(chunk);
+            let bytes_written:u32 = self.write_data_to_image(chunk);
+            if bytes_written != chunk.len() as u32{
+                error!("Incorrect number of bytes written: {}", bytes_written)
+            }
+            else {
+                if let Some(image) = &self.image {
+                    image.save("/home/mike/hidey/images/rat.png").expect("Failed to save image");
+                } else {
+                    panic!("Failed to get image");
+                }
+            }
         }
     }
 }
