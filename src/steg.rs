@@ -11,13 +11,13 @@
 //
 // Pic coded signature : 8 bytes
 // Password enabled : 1 byte, 'Y' or 'N'
-// If password enabled : 30 byte hash of password.
-// Number of files embedded : 2 digit integer, leading zeros.
+// If password enabled : 32 byte hash of password.
+// Number of files embedded : 3 digit integer, leading zeros.
 // For each file section the following applies:
 //
-// File name length: 2 digit integer, leading zeros.
+// File name length: 3 digit integer, leading zeros.
 // File name : file name string in file name length bytes.
-// File length in bytes : 8 digit integer, leading zeros.
+// File length in bytes : 10 digit integer, leading zeros.
 // File contents : file bytes in file length bytes.
 
 pub mod image_read;
@@ -28,8 +28,9 @@ extern crate ring;
 
 use log::{error, info, warn};
 
-use std::fs;
-use std::io;
+use std::fs::{self, File};
+use std::io::{self, Read};
+use std::path::Path;
 use std::path::PathBuf;
 use image::{DynamicImage, GenericImageView};
 use ring::digest;
@@ -368,7 +369,7 @@ impl Steganography {
 
 // Method to embed one or more files into a loaded image.
 impl Steganography {
-    pub fn embed_files(&mut self, embed_files:&[&str]) -> io::Result<()> {
+    pub fn embed_files(&mut self, pw:bool, pw_str:&str, embed_files:&[&str]) -> io::Result<()> {
         // Don't need to initialise image parameters as we require
         // a loaded image to embed files into.
         if self.img_to_proc == true {
@@ -399,11 +400,31 @@ impl Steganography {
 
                 // First step is to write the pic code preamble to the file.
                 self.embed_preamble();
+
+                // Next to to embed password if required.
+                self.embed_password(pw, pw_str);
+
+                // Next need to embed the number of files we are embedding.
+                let num_files:u16 = embed_files.len() as u16;
+                self.embed_num_of_files(num_files);
+
+                // Next need to embed files themselves, one at a time.
+                for file in embed_files {
+                    // Need to embed the file.
+                    // This also means embeddng the name of the file,
+                    // and the length of the file.
+                    if let Err(err) = self.embed_file(file) {
+                        eprintln!("Error: {}", err); 
+                    }
+                    else {
+                        info!("Successfully embedded file: {}", file);
+                    }
+                }
             }
             Ok(())
         }
         else {
-            println!("No files to process.");
+            info!("No files to process.");
             Ok(())
         }
     }
@@ -412,10 +433,12 @@ impl Steganography {
 // Method to add the preable code to the image.
 impl Steganography {
     pub fn embed_preamble(&mut self) {
+        info!("Embedding preamble into image.");
+
         // Initialise embedding parameters.
         self.init_embed_params();
 
-        // Send preample as bytes vector for embedding.
+        // Send preamble as bytes vector for embedding.
         // All writes to the image is done in chunks.
         let preamble_string = self.settings.prog_code.clone();
         let preamble_bytes = preamble_string.as_bytes();
@@ -424,13 +447,173 @@ impl Steganography {
             if bytes_written != chunk.len() as u32{
                 error!("Incorrect number of bytes written: {}", bytes_written)
             }
-            else {
-                if let Some(image) = &self.image {
-                    image.save("/home/mike/hidey/images/rat.png").expect("Failed to save image");
-                } else {
-                    panic!("Failed to get image");
+        }
+    }
+}
+
+// Method to embed password (if required) to the image.
+impl Steganography {
+    pub fn embed_password(&mut self, _pw:bool, _pw_str:&str) {
+        info!("Embedding whether passworded or not.");
+
+        // Initialise embedding parameters.
+        self.init_embed_params();
+
+        // Send pasword as applicable as bytes vector for embedding.
+        // All writes to the image is done in chunks.
+        if _pw == false {
+            let have_pw_str = String::from("N");
+            let have_pw_bytes = have_pw_str.as_bytes();
+            for chunk in have_pw_bytes.chunks(self.settings.byte_chunk.try_into().unwrap()) {
+                let bytes_written:u32 = self.write_data_to_image(chunk);
+                if bytes_written != chunk.len() as u32{
+                    error!("Incorrect number of bytes written: {}", bytes_written)
                 }
             }
+        }
+        else {
+            // We have a password to embed.
+            // First we need to get the hash of the password to embed.
+            info!("Embedding passworded.");
+            // First the tag that there is a password.
+            let have_pw_str = String::from("Y");
+            let have_pw_bytes = have_pw_str.as_bytes();
+            // Next we have the hashed password.
+            let digest = digest::digest(&digest::SHA256, _pw_str.as_bytes());
+            let hashed_password = digest.as_ref();
+            let password_bytes = hashed_password;
+            // Concatenate the two.
+            let pw_bytes:Vec<u8> = [have_pw_bytes, password_bytes].concat();
+            // Embed into image.
+            for chunk in pw_bytes.chunks(self.settings.byte_chunk.try_into().unwrap()) {
+                let bytes_written:u32 = self.write_data_to_image(chunk);
+                if bytes_written != chunk.len() as u32{
+                    error!("Incorrect number of bytes written: {}", bytes_written)
+                }
+            }
+        }
+    }
+}
+
+// Method to embed the number of files being embedded.
+impl Steganography {
+    pub fn embed_num_of_files(&mut self, num_files:u16) {
+        info!("Embedding number of files: {}", num_files);
+
+        // Initialise embedding parameters.
+        self.init_embed_params();
+
+        // Get the number of files as a string with leading 0s.
+        let _num_files:String = format!("{:0>3}", num_files);
+        let num_file_bytes = _num_files.as_bytes();
+
+        // Embed into image.
+        for chunk in num_file_bytes.chunks(self.settings.byte_chunk.try_into().unwrap()) {
+            let bytes_written:u32 = self.write_data_to_image(chunk);
+            if bytes_written != chunk.len() as u32{
+                error!("Incorrect number of bytes written: {}", bytes_written)
+            }
+        }
+    }
+}
+
+// Method to embed the contents of a file into the image.
+impl Steganography {
+    pub fn embed_file(&mut self, file_path:&str) -> io::Result<()> {
+        info!("Embedding file: {}", file_path);
+
+        // Initialise embedding parameters.
+        self.init_embed_params();
+
+        // Need to get the filename to give the file,
+        // and the length of this filename, as both are embedded.
+        // File name, and filename length.
+        let _file_path = Path::new(file_path);
+        // Extract file name.
+        let _file_name = _file_path.file_name().unwrap();
+        let _file_name_bytes = _file_name.as_encoded_bytes();
+        // Determine filename length.
+        // And format to 3 digits, with leading 0s.
+        let _file_name_len = _file_name.len() as u8;
+        let _file_name_len_str:String = format!("{:0>3}", _file_name_len);
+        let _file_name_len_bytes = _file_name_len_str.as_bytes();
+        // Determine file length in bytes.
+        // And format to 10 digits, with leading 0s.
+        let _metadata = fs::metadata(file_path)?;
+        let _file_size = _metadata.len();
+        let _file_size_str:String = format!("{:0>10}", _file_size);
+        let _file_size_bytes = _file_size_str.as_bytes();
+
+        // Concatenate file details for embedding.
+        let file_detail_bytes:Vec<u8> = [_file_name_len_bytes, _file_name_bytes, _file_size_bytes].concat();
+        // Embed into image.
+        for chunk in file_detail_bytes.chunks(self.settings.byte_chunk.try_into().unwrap()) {
+            let bytes_written:u32 = self.write_data_to_image(chunk);
+            if bytes_written != chunk.len() as u32{
+                error!("Incorrect number of bytes written: {}", bytes_written)
+            }
+        }
+
+        // Now the file needs to be written to the image.
+        // Will do this by reading chunks of data from the file at a time,
+        // and writing the data to the image, until the file is done.
+
+        // Open the file for reading.
+        let mut file = File::open(file_path)?;
+
+        // Define a buffer to use for the chunks of read data.
+        let mut buffer = vec![0u8; self.settings.byte_chunk as usize];
+
+        // Loop until there are no bytes in the file to write.
+        loop {
+            // Read a chunk of data from the file.
+            let bytes_read = file.read(&mut buffer)?;
+
+            // If no bytes were read, we've reached the end of the file.
+            if bytes_read == 0 {
+                break;
+            }
+
+            // Write the chunk of data to the image.
+            let bytes_written = self.write_data_to_image(&buffer[..bytes_read]);
+
+            // Check that the correct number of bytes were written.
+            if bytes_written != bytes_read as u32 {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Incorrect number of bytes written: {}", bytes_written),
+                ));
+            }
+        }
+        // Return ok result.
+        info!("File data written successfully.");
+        Ok(())
+    }
+}
+
+// Method to save image with name.
+// Will overwrite the existing image if no file specified.
+impl Steganography {
+    pub fn save_image(&mut self, mut save_file:String) {
+
+        // Check if file path string provided.
+        // If not then overwrite the loaded image file instead.
+        if save_file.len() == 0 {
+            save_file = self.image_file.clone();
+            info!("Overwritting original image.")
+        }
+        // Create path to image file .
+        let mut img_path = PathBuf::new();
+        // img_path.push("images");        
+        img_path.push(save_file.clone());
+        let img_path_string = img_path.to_string_lossy().into_owned();
+        info!("Writing to image: {}", img_path_string);
+
+        // Save the image with embedded data to file.
+        if let Some(image) = &self.image {
+            image.save(img_path_string).expect("Failed to save image");
+        } else {
+            panic!("Failed to save image file.");
         }
     }
 }

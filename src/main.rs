@@ -42,16 +42,27 @@ fn main() {
 
     // <Test 2a>
     // Loading a file and and embed file(s) into it.
-    // img_steg.init_embed_params();
-    // img_steg.load_new_file("rat.png".to_string());
-    // // Embed files into image.
-    // let embed_files = vec!["/home/mike/hidey/images/kitten-grass.png", "/home/mike/hidey/images/kitten-in-basket.jpg"];
-    // if let Err(err) = img_steg.embed_files(&embed_files) {
-    //     eprintln!("Error: {}", err);
-    // }
+    img_steg.init_embed_params();
+    img_steg.load_new_file("volleyballs.png".to_string());
+    // Embed files into image.
+    // Varients to embed with or without password.
+    let embed_files = vec!["/home/mike/hidey/images/kitten-grass.png", "/home/mike/hidey/images/kitten-in-basket.jpg"];
+    // Embed with no password.
+    // if let Err(err) = img_steg.embed_files(false, "", &embed_files) {
+    // Embed with a password.
+    if let Err(err) = img_steg.embed_files(true, "ratpig", &embed_files) {
+        eprintln!("Error: {}", err);
+    }
+    else {
+        // Save the embedded image to a file.
+        // Versions for empty filename meaning overwrite, or new file.
+        // For a new file specify empty string for file path/name.
+        // img_steg.save_image("".to_string())
+        img_steg.save_image("./images/rat.png".to_string())
+    }
 
     // <Test 2b>
     // Load the new image with embedded file and extract embedded file.
-    img_steg.init_embed_params();
-    img_steg.load_new_file("rat.png".to_string());
+    // img_steg.init_embed_params();
+    // img_steg.load_new_file("rat.png".to_string());
 }

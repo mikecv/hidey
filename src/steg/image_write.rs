@@ -2,7 +2,7 @@
 
 use crate::steg::Steganography;
 
-use log::{info, warn};
+use log::{warn};
 
 use image::{GenericImageView, Pixel};
 use crate::steg::image::GenericImage;
@@ -14,7 +14,6 @@ use crate::steg::image::GenericImage;
 // rgb format before embedding data.
 impl Steganography {
     pub fn write_data_to_image(&mut self, bytes:&[u8]) -> u32 {
-        info!("Writing bytes to image: {}", bytes.len());
 
         // Initial loop counters.
         let mut bytes_written:u32 = 0;
