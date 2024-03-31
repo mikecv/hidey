@@ -2,14 +2,11 @@
 
 use crate::steg::Steganography;
 
-use log::info;
-
 use image::{GenericImageView, Pixel};
 
 // Method to read a certain number of bytes from an image.
 impl Steganography {
     pub fn read_data_from_image(&mut self, bytes_to_read:u32) {
-        info!("Reading bytes from image: {}", bytes_to_read);
 
         // Initial loop counters.
         let mut bytes_read:u32 = 0;
