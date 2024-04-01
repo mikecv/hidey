@@ -37,6 +37,13 @@ use ring::digest;
 
 use crate::settings::Settings;
 
+// Struct to hold details about files embedded in an image.
+// This struct will be included in the main Steganography struct.
+pub struct EmbeddedFile {
+    pub file_name: String,
+    pub file_embedded: bool,
+}
+
 // Struct of parameters for embedd file and
 // for file to be embedded.
 pub struct Steganography {
@@ -64,6 +71,7 @@ pub struct Steganography {
     pub to_embed_file_path: String,
     pub to_embed_file_size: u32,
     pub embed_capacity: u64,
+    pub embeded_files: Vec<EmbeddedFile>,
 }
 
 // Initialise all struct variables.
@@ -96,6 +104,7 @@ impl Steganography {
             to_embed_file_path: String::from(""),
             to_embed_file_size: 0,
             embed_capacity: 0,
+            embeded_files: Vec::new(),
         }
     }
 }
@@ -188,7 +197,7 @@ impl Steganography {
         };
 
         // If we have an image file open, then read the parameters.
-        // Need to check if 3 colour  planes as well.
+        // Need to check if 3 colour planes as well.
         if cont_ckh == true {
             if let Some(image) = &self.image {
                 // Get image width and height
@@ -243,12 +252,23 @@ impl Steganography {
             // we can see if there is a password encoded in the image.
             // Password yes or no is in the next 1 byte.
             self.check_for_password();
+
+            // If password protected can't go further, until the user
+            // gives a valid password.
+            if self.pic_has_pw == false {
+                // If embedded image is not password protected
+                // we can continue, else not.
+                info!("Files embedded WITHOUT password.")
+            }
+            else {
+                info!("Files embedded WITH password.")
+            }
         }
     }
 }
 
-// Method to check if image has been previousl encoded,
-// that is, it contains the preable code.
+// Method to check if image has been previously encoded,
+// that is, it contains the preamble code.
 impl Steganography {
     pub fn check_for_code(&mut self) {
         // First check if file is even large enough to hold a code.
@@ -327,38 +347,50 @@ impl Steganography {
     }
 }
 
+// Method to extract data from file.
+// Password string required, empty string if no
+// password required.
+impl Steganography {
+    pub fn extract_data(&mut self, pw:String) {
+        // If password required then check it.
+        if self.pic_has_pw == true {
+            // Password required, so check password provided.
+            self.check_valid_password(pw);
+            if self.user_permit == true {
+                info!("Correct password provided.");
+            }
+            else {
+                info!("Correct password NOT provided.");
+                return;
+            }
+        }
+        // Either password not required or correct password entered.
+        // Either way we can proceed with extracting data.
+        self.get_embeded_data();
+    }
+}
+
 // Method to check user's password entry.
 impl Steganography {
     pub fn check_valid_password(&mut self, password: String) {
         // Before checking the password we have to get the
         // hashed password stored in the image.
         // The password is a SHA-256 so always 32 bytes long.
-        let bytes_to_read:u32 = self.settings.pw_hash_len.into();
+        let bytes_to_read:u32 = 32;
         self.read_data_from_image(bytes_to_read);
         if self.bytes_read != bytes_to_read {
             error!("Expected bytes: {}, bytes read: {}", bytes_to_read, self.bytes_read);
-            info!("Image password invalid length.");  
             self.user_permit = false;
             return;
         }
         else {
             // Check password against hash of user entry.
-            let string_result = String::from_utf8((&*self.code_bytes).to_vec());
-            match string_result {
-                Ok(string) => {
-                    // Check password against hash of user entry.
-                    let hashed_entry =  digest::digest(&digest::SHA256, password.as_bytes());
-                    let hashed_password = hashed_entry.as_ref();
-                    if string == std::str::from_utf8(hashed_password).unwrap() {
-                        self.user_permit = true;
-                        info!("User entered password matches.");
-                    }
-                    else {
-                        self.user_permit = false;
-                        info!("User entered password does not match.");
-                    }
+            match digest::digest(&digest::SHA256, password.as_bytes()).as_ref() == &self.code_bytes[..] {
+                true => {
+                    self.user_permit = true;
+                    info!("User entered password matches.");
                 }
-                _ => {
+                false => {
                     self.user_permit = false;
                     info!("User entered password does not match.");
                 }
@@ -367,9 +399,164 @@ impl Steganography {
     }
 }
 
+// Method to get embedded data from the image.
+impl Steganography {
+    pub fn get_embeded_data(&mut self) {
+
+        // First get the number of files embedded.
+        let bytes_to_read:u32 = 3;
+        self.read_data_from_image(bytes_to_read);
+        if self.bytes_read != bytes_to_read {
+            error!("Expected bytes: {}, bytes read: {}", bytes_to_read, self.bytes_read);
+            return;
+        }
+        else {
+            let _string_result = String::from_utf8((&*self.code_bytes).to_vec());
+            match _string_result {
+                Ok(string) => {
+                    let num_files:u8 = string.parse().unwrap();
+                    info!("Number of embedded files: {}", num_files);
+
+                    // Lets process each embedded file, one by one.
+                    for idx in 1..= num_files {
+                        println!("Extracting file: {}", idx);
+
+                        // First get the length of the file name.
+                        let bytes_to_read:u32 = 3;
+                        self.read_data_from_image(bytes_to_read);
+                        if self.bytes_read != bytes_to_read {
+                            error!("Expected bytes: {}, bytes read: {}", bytes_to_read, self.bytes_read);
+                            return;
+                        }
+                        else {
+                            let _string_result = String::from_utf8((&*self.code_bytes).to_vec());
+                            match _string_result {
+                                Ok(string) => {
+                                    let file_name_len:u8 = string.parse().unwrap();
+                                    info!("File name length: {}", file_name_len);
+
+                                    // Now that we have the length of the file name we can extract it.
+                                    let bytes_to_read:u32 = file_name_len as u32;
+                                    self.read_data_from_image(bytes_to_read);
+                                    if self.bytes_read != bytes_to_read {
+                                        error!("Expected bytes: {}, bytes read: {}", bytes_to_read, self.bytes_read);
+                                        return;
+                                    }
+                                    else {
+                                        let _string_result = String::from_utf8((&*self.code_bytes).to_vec());
+                                        match _string_result {
+                                            Ok(string) => {
+                                                let file_name:String = string;
+                                                info!("File name: {}", file_name);
+
+                                                // Now we need to get the length of the file.
+                                                let bytes_to_read:u32 = 10;
+                                                self.read_data_from_image(bytes_to_read);
+                                                if self.bytes_read != bytes_to_read {
+                                                    error!("Expected bytes: {}, bytes read: {}", bytes_to_read, self.bytes_read);
+                                                    return;
+                                                }
+                                                else {
+                                                    let _string_result = String::from_utf8((&*self.code_bytes).to_vec());
+                                                    match _string_result {
+                                                        Ok(string) => {
+                                                            let file_len:u32 = string.parse().unwrap();
+                                                            info!("File length: {}", file_len);
+
+                                                            // Now we have all the file details we can
+                                                            // read the data from the image and construct
+                                                            // the file.
+                                                            let _ = self.extract_file(file_len, file_name);
+                                                        }
+                                                        _ => {
+                                                            warn!("Invalid file length.");
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            _ => {
+                                                warn!("Invalid file name length.");
+                                            }
+                                        }
+                                    }                       
+                                }
+                                _ => {
+                                    warn!("Invalid file name length.");
+                                }
+                            }
+                        }
+                    }
+
+                }
+                _ => {
+                    warn!("Invalid file name length.");
+                }
+            }
+        }
+    }
+}
+
+// Method to extract a file from the image,
+// and save it to file.
+impl Steganography {
+    pub fn extract_file(&mut self, file_size:u32, file_name:String) -> io::Result<()> {
+        info!("Extracting file of size: {}, to: {}.", file_size, file_name);
+
+        // Now the file data in the image needs to be written to a
+        // file.
+        // Will do this by reading chunks of data from the image at a time,
+        // and appending chunks to the file.
+        // When the file is complete save the file.
+
+        // Open the file for writing.
+        let mut _file = File::open(file_name)?;
+
+        // Keep track of bytes left to write.
+        let mut bytes_remaining:u32 = file_size;
+
+        // Chunk of bytes to read each tiem.
+        // Except maybe the last time when likely to be less.
+        let mut bytes_to_read = self.settings.byte_chunk;
+
+        // Keep reading data from image until file read in full.
+        while bytes_remaining > 0 {
+            // Check if we have to read a full or part of a chunk.
+            if bytes_remaining < self.settings.byte_chunk {
+                bytes_to_read = bytes_remaining;
+            }
+
+            // Now we have to read a chunk from the image
+            // and write it to the file.
+            self.read_data_from_image(bytes_to_read);
+            if self.bytes_read != bytes_to_read {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Incorrect number of bytes read: {}", self.bytes_read),
+                ));
+            }
+            else {
+                // Read a chunk of data from the file.
+                // <TO DO> <WRITE self.bytes_read to file>
+
+                // Update the number of bytes remaining to read.
+                bytes_remaining = bytes_remaining - self.settings.byte_chunk;
+            }
+        }
+        // No more bytes to write, so save the file.
+        // The file name is an argument to the method.
+        // Ideally, would like not to override a file of the same name,
+        // but rather add a suffix to the file name, e.g. -1, -2 or similat.
+        // <TO DO> <SAVE to file file_name>
+
+        // Return ok result.
+        info!("Data written to file successfully.");
+        Ok(())       
+    }
+}
+
 // Method to embed one or more files into a loaded image.
 impl Steganography {
-    pub fn embed_files(&mut self, pw:bool, pw_str:&str, embed_files:&[&str]) -> io::Result<()> {
+    pub fn embed_files(&mut self, pw:bool, pw_str:&str, files_to_embed:&[&str]) -> io::Result<()> {
         // Don't need to initialise image parameters as we require
         // a loaded image to embed files into.
         if self.img_to_proc == true {
@@ -381,7 +568,7 @@ impl Steganography {
 
             // First check is to see if there is space for the file(s) requested.
             let mut bytes_to_embed = 0;
-            for file in embed_files {
+            for file in files_to_embed {
                 // Need to get sum of file lengths to embed.
                 let metadata = fs::metadata(file)?;
                 let file_size = metadata.len();
@@ -405,11 +592,11 @@ impl Steganography {
                 self.embed_password(pw, pw_str);
 
                 // Next need to embed the number of files we are embedding.
-                let num_files:u16 = embed_files.len() as u16;
+                let num_files:u16 = files_to_embed.len() as u16;
                 self.embed_num_of_files(num_files);
 
                 // Next need to embed files themselves, one at a time.
-                for file in embed_files {
+                for file in files_to_embed {
                     // Need to embed the file.
                     // This also means embeddng the name of the file,
                     // and the length of the file.
@@ -436,6 +623,8 @@ impl Steganography {
         info!("Embedding preamble into image.");
 
         // Initialise embedding parameters.
+        // Reset before preabmle, NEVER after the preamble
+        // else will overwrite early data.
         self.init_embed_params();
 
         // Send preamble as bytes vector for embedding.
@@ -455,9 +644,6 @@ impl Steganography {
 impl Steganography {
     pub fn embed_password(&mut self, _pw:bool, _pw_str:&str) {
         info!("Embedding whether passworded or not.");
-
-        // Initialise embedding parameters.
-        self.init_embed_params();
 
         // Send pasword as applicable as bytes vector for embedding.
         // All writes to the image is done in chunks.
@@ -500,9 +686,6 @@ impl Steganography {
     pub fn embed_num_of_files(&mut self, num_files:u16) {
         info!("Embedding number of files: {}", num_files);
 
-        // Initialise embedding parameters.
-        self.init_embed_params();
-
         // Get the number of files as a string with leading 0s.
         let _num_files:String = format!("{:0>3}", num_files);
         let num_file_bytes = _num_files.as_bytes();
@@ -521,9 +704,6 @@ impl Steganography {
 impl Steganography {
     pub fn embed_file(&mut self, file_path:&str) -> io::Result<()> {
         info!("Embedding file: {}", file_path);
-
-        // Initialise embedding parameters.
-        self.init_embed_params();
 
         // Need to get the filename to give the file,
         // and the length of this filename, as both are embedded.
@@ -586,7 +766,7 @@ impl Steganography {
             }
         }
         // Return ok result.
-        info!("File data written successfully.");
+        info!("File data written to image successfully.");
         Ok(())
     }
 }
