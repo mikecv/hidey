@@ -29,7 +29,7 @@ extern crate ring;
 use log::{error, info, warn};
 
 use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use image::{DynamicImage, GenericImageView};
@@ -276,7 +276,7 @@ impl Steganography {
         if self.embed_capacity < self.settings.min_capacity {
             warn!("Capacity less than min for coding (bytes): {}", self.embed_capacity);
             self.pic_coded = false;
-            return
+            return;
         }
 
         // File large enough to hold preamble code.
@@ -418,8 +418,7 @@ impl Steganography {
                     info!("Number of embedded files: {}", num_files);
 
                     // Lets process each embedded file, one by one.
-                    for idx in 1..= num_files {
-                        println!("Extracting file: {}", idx);
+                    for _idx in 1..= num_files {
 
                         // First get the length of the file name.
                         let bytes_to_read:u32 = 3;
@@ -508,8 +507,44 @@ impl Steganography {
         // and appending chunks to the file.
         // When the file is complete save the file.
 
+        // Check if file for storing embeded files exists.
+        // If it doesn't exist, create it.
+        fs::create_dir_all(&self.settings.secret_folder)?;
+
+        // Get file path for write file.
+        let mut wrt_path = PathBuf::new();       
+        wrt_path.push(&self.settings.secret_folder);
+        wrt_path.push(file_name.clone());
+        let mut wrt_path_string = wrt_path.to_string_lossy().into_owned();
+
+        // Check if we are going to overwrite an existing file.
+        // If so we will add a suffix to the end of the file name
+        // to make it unique.
+        let mut suffix = 1;
+        let original_filename = wrt_path_string.clone();
+        while Path::new(&wrt_path_string).exists() {
+            // Construct next suffix.
+            let extension = match original_filename.rfind('.') {
+                Some(idx) => &original_filename[idx..],
+                None => "",
+            };
+
+            // Construct base file path.
+            let base_filename = if let Some(idx) = original_filename.rfind('.') {
+                &original_filename[..idx]
+            } else {
+                &original_filename
+            };
+
+            // Construct complete file name.
+            wrt_path_string = format!("{}-{:03}{}", base_filename, suffix, extension);
+            // Increment suffix if this file name exists.
+            suffix += 1;
+        }
+
         // Open the file for writing.
-        let mut _file = File::open(file_name)?;
+        info!("Opening file: {}, for writing.", wrt_path_string);
+        let mut file = File::create(&wrt_path_string)?;
 
         // Keep track of bytes left to write.
         let mut bytes_remaining:u32 = file_size;
@@ -525,32 +560,27 @@ impl Steganography {
                 bytes_to_read = bytes_remaining;
             }
 
-            // Now we have to read a chunk from the image
-            // and write it to the file.
+            // Read a chunk of bytes from the image.
             self.read_data_from_image(bytes_to_read);
             if self.bytes_read != bytes_to_read {
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
                     format!("Incorrect number of bytes read: {}", self.bytes_read),
                 ));
-            }
-            else {
+            } else {
                 // Read a chunk of data from the file.
-                // <TO DO> <WRITE self.bytes_read to file>
+                // Write self.bytes_read to file.
+                file.write_all(&self.code_bytes)?;
 
                 // Update the number of bytes remaining to read.
-                bytes_remaining = bytes_remaining - self.settings.byte_chunk;
+                bytes_remaining = bytes_remaining - self.bytes_read as u32;
             }
         }
-        // No more bytes to write, so save the file.
-        // The file name is an argument to the method.
-        // Ideally, would like not to override a file of the same name,
-        // but rather add a suffix to the file name, e.g. -1, -2 or similat.
-        // <TO DO> <SAVE to file file_name>
 
-        // Return ok result.
-        info!("Data written to file successfully.");
-        Ok(())       
+        // File writing completed, so save and close the file.
+        // No need to manually close as the file will be closed when it goes out of scope.
+        info!("Data written to file successfully: {}", file_name);
+        Ok(())
     }
 }
 
