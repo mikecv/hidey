@@ -52,17 +52,17 @@ impl Steganography {
                 // Next time around we need to point to the next pixel in the row.
                 col_cnt = col_cnt + 1;
                 // Until we get to the end of the row.
-                // Then more to the start of the next row.
+                // Then move to the start of the next row.
                 if col_cnt == self.pic_width {
                     col_cnt = 0;
                     row_cnt = row_cnt + 1;
                     // If we have reached the end of the image then go
-                    // back to the top and go to the text bit.
+                    // back to the top and go to the next bit.
                     if row_cnt == self.pic_height {
                         row_cnt = 0;
                         col_plane = col_plane + 1;
                         // If we have processed the last plane (colour)
-                        // We go back to the next bit of the first plane,
+                        // ee go back to the next bit of the first plane,
                         if col_plane == 3 {
                             col_plane = 0;
                             _bits_read = _bits_read + 1;
@@ -79,6 +79,8 @@ impl Steganography {
         }
 
         // Save the state of the reading.
+        // This allows us to carry on reading from where we
+        // left off on the next chunk of reading.
         self.row = row_cnt;
         self.col = col_cnt;
         self.plane = col_plane;

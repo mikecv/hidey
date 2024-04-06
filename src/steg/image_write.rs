@@ -38,7 +38,7 @@ impl Steganography {
             // Extract 1 byte of data from image.
             // one bit at a time.
             for _idx in 1..9 {
-                // Get next bit for byte in the array.
+                // Get next bit of the byte in the array.
                 if (byte_data & _mask) == 0{
                     _mapped_bit = 0;
                 }
@@ -64,6 +64,8 @@ impl Steganography {
                     }
 
                     // Update the pixel colour now that the colour component has been modified.
+                    // Note that the image method works with rgba,
+                    // So we set a to 255 (no transparency).
                     let modified_pixel = image::Rgba([r, g, b, 255]);
                     img.put_pixel(col_cnt, row_cnt, modified_pixel);
                     self.image = Some(img);
@@ -81,7 +83,7 @@ impl Steganography {
                     // back to the top and go to the next bit.
                     if row_cnt == self.pic_height {
                         row_cnt = 0;
-                        // Point to next colour plane.
+                        // Point to the next colour plane.
                         // Take into account number of planes.
                         col_plane = col_plane + 1;
                         if col_plane == 3 {
@@ -92,10 +94,8 @@ impl Steganography {
                         }     
                     }
                 }
-
-
             }
-            // Increment characters write counter.
+            // Increment characters writen counter.
             bytes_written = bytes_written + 1;
         }
 
