@@ -8,5 +8,6 @@
 /logs
 /logs/*.log
 
-# Ignore image files.
+# Ignore image and embedded files.
 /images
+/secret
