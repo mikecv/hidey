@@ -274,16 +274,8 @@ impl Steganography {
     pub fn check_for_code(&mut self) {
         // First check if file is even large enough to hold a code.
         // Can do this by checking emdedding capacity.
-        if self.pic_coded == true {
-            if self.embed_capacity < self.settings.min_capacity {
-                warn!("Capacity less than minimum for coding (bytes): {}", self.embed_capacity);
-                self.pic_coded = false;
-                return;
-            }
-        }
-        else {
-            // Image does not contain preamble code.
-            // Can stop here.
+        if self.embed_capacity < self.settings.min_capacity {
+            warn!("Capacity less than minimum for coding (bytes): {}", self.embed_capacity);
             self.pic_coded = false;
             return;
         }

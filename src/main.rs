@@ -39,6 +39,7 @@ fn main() {
     // Loading a file and checking it for embedded files.
     img_steg.init_embed_params();
     img_steg.load_new_file("volleyballs-2.png".to_string());
+    // img_steg.load_new_file("rat.png".to_string());
 
     // <Test 2a>
     // Loading a file and embed file(s) into it.
@@ -60,7 +61,7 @@ fn main() {
         // Versions for empty filename meaning overwrite, or new file.
         // For a new file specify empty string for file path/name.
         // img_steg.save_image("".to_string())
-        // img_steg.save_image("./images/rat.png".to_string())
+    //     img_steg.save_image("./images/rat.png".to_string())
     // }
 
     // <Test 2b>
@@ -74,6 +75,7 @@ fn main() {
     // This will indicate if it embedded and if is password protected.
     // img_steg.init_embed_params();
     // img_steg.load_new_file("volleyballs-2.png".to_string());
+    // img_steg.load_new_file("rat.png".to_string());
 
     // Extracted the embedded data.
     // There may be a password required.
