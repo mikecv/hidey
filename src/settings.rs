@@ -1,6 +1,6 @@
 use serde::{Deserialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
     pub settings_version: String,
     pub max_embed_ratio: f32,

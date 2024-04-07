@@ -27,15 +27,15 @@ extern crate image;
 extern crate ring;
 
 use log::{error, info, warn};
-
+use image::{DynamicImage, GenericImageView};
+use ring::digest;
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
 use std::path::Path;
 use std::path::PathBuf;
-use image::{DynamicImage, GenericImageView};
-use ring::digest;
 
 use crate::settings::Settings;
+use crate::SETTINGS;
 
 // Struct to hold details about files embedded in an image.
 // This struct will be included in the main Steganography struct.
@@ -77,8 +77,12 @@ pub struct Steganography {
 // Initialise all struct variables.
 // This method called at the start.
 impl Steganography {
-    pub fn init(settings: Settings) -> Self {
+    pub fn init() -> Self {
         info!("Initialising Steganography struct.");
+
+        // Lock the global SETTINGS to obtain access to the Settings object
+        let settings = SETTINGS.lock().unwrap().clone();
+
         Steganography {
             settings,
             img_to_proc: false,

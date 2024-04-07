@@ -12,4 +12,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 image = "0.23"
 ring = "0.16.20"
+lazy_static = "1.4"
+[dependencies.gtk]
+package = "gtk4"
+version = "0.8.1"
+features = ["v4_2"]
 
