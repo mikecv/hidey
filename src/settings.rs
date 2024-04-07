@@ -8,4 +8,5 @@ pub struct Settings {
     pub prog_code: String,
     pub byte_chunk: u32,
     pub secret_folder: String,
+    pub thumb_folder: String,
 }

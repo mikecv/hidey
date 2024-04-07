@@ -1,21 +1,21 @@
 // Steganography data structure and methods.
 //
-// Steganography in this application is embedding files in lossless images,
+// Steganography in this application is embedding files in lossess images,
 // specifically in PNG format images.
-// Supported formats are rgb and rgb colour formats,although only
+// Supported formats are rgb and rgba colour formats, although only
 // the rgb colour bytes are used to encode data into.
 //
-// A pic coded image contains a particular 8 byte string embedded in the image.
+// A pic coded image contains a particular byte string embedded in the image.
 // Here 'contains' implies embedded in the image colour bytes.
 // The format of pic coded files is as follows:
 //
-// Pic coded signature : 8 bytes
-// Password enabled : 1 byte, 'Y' or 'N'
+// Pic coded signature : specific, but arbitray number of bytes.
+// Password enabled : 1 byte, 'Y' or 'N'.
 // If password enabled : 32 byte hash of password.
 // Number of files embedded : 3 digit integer, leading zeros.
 // For each file section the following applies:
 //
-// File name length: 3 digit integer, leading zeros.
+// File name length : 3 digit integer, leading zeros.
 // File name : file name string in file name length bytes.
 // File length in bytes : 10 digit integer, leading zeros.
 // File contents : file bytes in file length bytes.
@@ -71,7 +71,7 @@ pub struct Steganography {
     pub to_embed_file_path: String,
     pub to_embed_file_size: u32,
     pub embed_capacity: u64,
-    pub embeded_files: Vec<EmbeddedFile>,
+    pub embedded_files: Vec<EmbeddedFile>,
 }
 
 // Initialise all struct variables.
@@ -104,7 +104,7 @@ impl Steganography {
             to_embed_file_path: String::from(""),
             to_embed_file_size: 0,
             embed_capacity: 0,
-            embeded_files: Vec::new(),
+            embedded_files: Vec::new(),
         }
     }
 }
@@ -160,13 +160,14 @@ impl Steganography {
 
         // Create path to image.
         let mut img_path = PathBuf::new();
-        img_path.push("images");        
+        img_path.push(&self.settings.thumb_folder);        
+        // img_path.push("images");        
         img_path.push(in_file.clone());
         let img_path_string = img_path.to_string_lossy().into_owned();
         self.image_file = img_path_string;
 
         let img_result = image::open(&img_path);
-        // Handle exceptions, specific like file not found, and generic.
+        // Handle exceptions, specific file not found, and generic.
         let _img = match img_result {
             Ok(_img) => {
                 // Set flag to indicate we have an image to process.
@@ -204,24 +205,24 @@ impl Steganography {
                 (self.pic_width, self.pic_height) = image.dimensions();
                 info!("Image loaded with width: {}, height: {}", self.pic_width, self.pic_height);
 
-                // Need to check if color format is acceptable.
+                // Need to check if colour format is acceptable.
                 // Need 3 color planes.
                 let cols = image.color();
                 match cols {
                     // Even though only writing to rgb planes for now,
                     // Need to keep track if there is a transparency layer.
                     image::ColorType::Rgb8 => {
-                        // Store number of color planes
+                        // Store number of colour planes
                         self.pic_col_planes = 3;
                         info!("Image loaded with colour planes: {}", self.pic_col_planes);
                     }
                     image::ColorType::Rgba8 => {
-                        // Store number of color planes
+                        // Store number of colour planes
                         self.pic_col_planes = 4;
                         info!("Image loaded with colour planes: {}", self.pic_col_planes);
                     }
                     _ => {
-                        // Unsupported image color type
+                        // Unsupported image colour type
                         info!("Image not a supported rgb colour type.");
                     }
                 }
@@ -250,14 +251,14 @@ impl Steganography {
 
             // Now that we know that the image is pic coded,
             // we can see if there is a password encoded in the image.
-            // Password yes or no is in the next 1 byte.
+            // Password yes (Y) or no (N) is in the next 1 byte.
             self.check_for_password();
 
             // If password protected can't go further, until the user
             // gives a valid password.
             if self.pic_has_pw == false {
                 // If embedded image is not password protected
-                // we can continue, else not.
+                // we can continue.
                 info!("Files embedded WITHOUT password.")
             }
             else {
@@ -274,7 +275,7 @@ impl Steganography {
         // First check if file is even large enough to hold a code.
         // Can do this by checking emdedding capacity.
         if self.embed_capacity < self.settings.min_capacity {
-            warn!("Capacity less than min for coding (bytes): {}", self.embed_capacity);
+            warn!("Capacity less than minimum for coding (bytes): {}", self.embed_capacity);
             self.pic_coded = false;
             return;
         }
@@ -332,7 +333,7 @@ impl Steganography {
             let string_result = String::from_utf8((&*self.code_bytes).to_vec());
             match string_result {
                 Ok(string) => {
-                    // String read so need to see if it Y or N.
+                    // String read so need to see if it is Y or N.
                     if string == "Y" {
                         self.pic_has_pw = true;
                         info!("Image includes a password.");
@@ -366,7 +367,7 @@ impl Steganography {
         }
         // Either password not required or correct password entered.
         // Either way we can proceed with extracting data.
-        self.get_embeded_data();
+        self.get_embedded_data();
     }
 }
 
@@ -401,7 +402,7 @@ impl Steganography {
 
 // Method to get embedded data from the image.
 impl Steganography {
-    pub fn get_embeded_data(&mut self) {
+    pub fn get_embedded_data(&mut self) {
 
         // First get the number of files embedded.
         let bytes_to_read:u32 = 3;
@@ -417,7 +418,7 @@ impl Steganography {
                     let num_files:u8 = string.parse().unwrap();
                     info!("Number of embedded files: {}", num_files);
 
-                    // Lets process each embedded file, one by one.
+                    // Let's process each embedded file, one by one.
                     for _idx in 1..= num_files {
 
                         // First get the length of the file name.
@@ -462,7 +463,7 @@ impl Steganography {
                                                             let file_len:u32 = string.parse().unwrap();
                                                             info!("File length: {}", file_len);
 
-                                                            // Now we have all the file details we can
+                                                            // Now we have all the file details, we can
                                                             // read the data from the image and construct
                                                             // the file.
                                                             let _ = self.extract_file(file_len, file_name);
@@ -507,11 +508,12 @@ impl Steganography {
         // and appending chunks to the file.
         // When the file is complete save the file.
 
-        // Check if file for storing embeded files exists.
+        // Check if folder for storing embedded files exists.
         // If it doesn't exist, create it.
         fs::create_dir_all(&self.settings.secret_folder)?;
 
-        // Get file path for write file.
+        // Get file path for the file to be written.
+        // All files will be written to a specific folder.
         let mut wrt_path = PathBuf::new();       
         wrt_path.push(&self.settings.secret_folder);
         wrt_path.push(file_name.clone());
@@ -528,14 +530,12 @@ impl Steganography {
                 Some(idx) => &original_filename[idx..],
                 None => "",
             };
-
             // Construct base file path.
             let base_filename = if let Some(idx) = original_filename.rfind('.') {
                 &original_filename[..idx]
             } else {
                 &original_filename
             };
-
             // Construct complete file name.
             wrt_path_string = format!("{}-{:03}{}", base_filename, suffix, extension);
             // Increment suffix if this file name exists.
@@ -555,7 +555,7 @@ impl Steganography {
 
         // Keep reading data from image until file read in full.
         while bytes_remaining > 0 {
-            // Check if we have to read a full or part of a chunk.
+            // Check if we have read a full or part chunk.
             if bytes_remaining < self.settings.byte_chunk {
                 bytes_to_read = bytes_remaining;
             }
@@ -568,8 +568,7 @@ impl Steganography {
                     format!("Incorrect number of bytes read: {}", self.bytes_read),
                 ));
             } else {
-                // Read a chunk of data from the file.
-                // Write self.bytes_read to file.
+                // Write bytes read to the file.
                 file.write_all(&self.code_bytes)?;
 
                 // Update the number of bytes remaining to read.
@@ -596,7 +595,7 @@ impl Steganography {
             // We should also alaready know the embedding width, height,
             // and embedding capacity of the image.
 
-            // First check is to see if there is space for the file(s) requested.
+            // First check to see if there is space for the file(s) requested.
             let mut bytes_to_embed = 0;
             for file in files_to_embed {
                 // Need to get sum of file lengths to embed.
@@ -615,10 +614,10 @@ impl Steganography {
                 // Within the embedding capacity of the image, so proceed.
                 info!("Total data to embed: {} bytes", bytes_to_embed);
 
-                // First step is to write the pic code preamble to the file.
+                // First step is to write the preamble to the file.
                 self.embed_preamble();
 
-                // Next to to embed password if required.
+                // Next we need to embed a password if required.
                 self.embed_password(pw, pw_str);
 
                 // Next need to embed the number of files we are embedding.
@@ -748,7 +747,7 @@ impl Steganography {
         let _file_name_len_str:String = format!("{:0>3}", _file_name_len);
         let _file_name_len_bytes = _file_name_len_str.as_bytes();
         // Determine file length in bytes.
-        // And format to 10 digits, with leading 0s.
+        // Format to 10 digits, with leading 0s.
         let _metadata = fs::metadata(file_path)?;
         let _file_size = _metadata.len();
         let _file_size_str:String = format!("{:0>10}", _file_size);
@@ -814,8 +813,7 @@ impl Steganography {
         }
         // Create path to image file .
         let mut img_path = PathBuf::new();
-        // img_path.push("images");        
-        img_path.push(save_file.clone());
+        img_path.push(&save_file.clone());
         let img_path_string = img_path.to_string_lossy().into_owned();
         info!("Writing to image: {}", img_path_string);
 

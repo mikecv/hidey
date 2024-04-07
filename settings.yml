@@ -6,4 +6,4 @@ min_capacity:       1000
 prog_code:          "PICCODER"
 byte_chunk:         50000
 secret_folder:      "./secret"
-
+thumb_folder:       "./images"
