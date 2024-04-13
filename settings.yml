@@ -7,3 +7,6 @@ prog_code:          "PICCODER"
 byte_chunk:         50000
 secret_folder:      "./secret"
 thumb_folder:       "./images"
+# UI settings.
+window_width:       1000
+window_height:      700
