@@ -12,4 +12,15 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8"
 image = "0.23"
 ring = "0.16.20"
+lazy_static = "1.4"
+glib = "^0"
 
+# For specific version of gtk4 bindings.
+# Else can use the bleeding edge from github.
+#gtk = { version = "0.8.1", package = "gtk4", features = ["v4_2"] }
+gtk = { git = "https://github.com/gtk-rs/gtk4-rs.git", package = "gtk4" }
+
+# For specific version of gio bindings.
+# Else can use the bleeding edge from github.
+#gio = "^0.9"
+gio = { git = "https://github.com/gtk-rs/gtk-rs-core.git", package = "gio" }

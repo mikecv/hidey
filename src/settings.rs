@@ -1,6 +1,6 @@
 use serde::{Deserialize};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Settings {
     pub settings_version: String,
     pub max_embed_ratio: f32,
@@ -9,4 +9,6 @@ pub struct Settings {
     pub byte_chunk: u32,
     pub secret_folder: String,
     pub thumb_folder: String,
+    pub window_width: i32,
+    pub window_height: i32,
 }
