@@ -2,9 +2,7 @@
 
 use log::info;
 use log4rs;
-
 use gtk::prelude::*;
-
 use lazy_static::lazy_static;
 use std::fs::File;
 use std::io::prelude::*;
@@ -13,7 +11,7 @@ use serde_yaml;
 
 use crate::settings::Settings;
 use crate::steg::Steganography;
-use crate::ui::build_ui;
+use crate::ui::{on_activate, on_startup};
 
 pub mod settings;
 pub mod steg;
@@ -35,6 +33,7 @@ lazy_static! {
     };
 }
 
+// Steganoraphy mainline.
 fn main() {
     // Set up application logging.
     // Configuration held in log4rs.yml .
@@ -47,18 +46,12 @@ fn main() {
     let mut _img_steg = Steganography::init();
 
     // Create a new GTK application.
-    let app = gtk::Application::builder()
+    let application = gtk::Application::builder()
     .application_id("com.example.steganography")
     .build();
 
-    // Build Steganography UI.
-    app.connect_activate(|app| {
-        let settings = SETTINGS.lock().unwrap();
-        let window_width = settings.window_width;
-        let window_height = settings.window_height;
-
-        build_ui(app, window_width, window_height);
-    });
-
-    app.run();
+    // Start up and activate UI application.
+    application.connect_startup(on_startup);
+    application.connect_activate(on_activate);
+    application.run();
 }
