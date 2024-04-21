@@ -1,48 +1,69 @@
 // Steganography UI configuration and interfaces
 // to Steganography class methods.
 
-extern crate gio;
+use crate::SETTINGS;
+use crate::settings::Settings;
 extern crate gtk;
 
-use gtk::prelude::*;
-use gtk::{Button};
+use gtk::{gio, prelude::*};
 use gtk::{Application, ApplicationWindow};
 
-pub fn build_ui(app: &Application, window_width: i32, window_height: i32) {
-    let v_box = gtk::Box::new(gtk::Orientation::Vertical, 10);
-
-    // Call the function to create the test button and add it to the v_box.
-    let test_button = create_test_button();
-    v_box.append(&test_button);
-
-    // Create the application window and add any children.
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title("Hidey-Ho")
-        .default_width(window_width)
-        .default_height(window_height)
-        .child(&v_box)
+// Function to create application UI elements.
+pub fn on_startup(app: &gtk::Application) {
+    // Create an action for an 'About' menu item.
+    // <TODO> Create a proper about box dialog on a Help top level menu.
+    // On the same Help menu have a User Guide menu option.
+        let about = gio::ActionEntry::builder("about")
+        .activate(|_, _, _| println!("About was pressed"))
         .build();
 
-    window.present();
+    // Create an action for an applicatioin quit menu item.
+    let quit = gio::ActionEntry::builder("quit")
+        .activate(|app: &gtk::Application, _, _| app.quit())
+        .build();
+
+    // Add menu item actions to the application UI. 
+    app.add_action_entries([about, quit]);
+
+    // Create menubar selection items.
+    // <TODO> Have top level menues for File and Edit.
+    // On File menu have sub-menu items for Open and Save image functions.
+    // On the edit menu have sub-menu items for Embed and Preview image functions.
+    let menubar = {
+        let file_menu = {
+            let about_menu_item = gio::MenuItem::new(Some("About"), Some("app.about"));
+            let quit_menu_item = gio::MenuItem::new(Some("Quit"), Some("app.quit"));
+
+            let file_menu = gio::Menu::new();
+            file_menu.append_item(&about_menu_item);
+            file_menu.append_item(&quit_menu_item);
+            file_menu
+        };
+
+        // Create an application menubar and associate items to it.
+        let menubar = gio::Menu::new();
+        menubar.append_submenu(Some("File"), &file_menu);
+        // Return menubar object.
+        menubar
+    };
+    // Associate menubar with the application UI.
+    app.set_menubar(Some(&menubar));
 }
 
-// Function to create a test button.
-// Not part of the Steganography application.
-fn create_test_button() -> Button {
-    let test_button = Button::builder()
-        .label("Test Button, Press me!")
-        .margin_top(12)
-        .margin_bottom(12)
-        .margin_start(12)
-        .margin_end(12)
+// Create the application window and add any children.
+pub fn on_activate(application: &Application) {
+    // Access lazy global settings from main.
+    let settings_lock = SETTINGS.lock().unwrap();
+    let settings: &Settings = &*settings_lock;
+
+    let window = ApplicationWindow::builder()
+        .application(application)
+        .title("Hidey-Ho")
+        .default_width(settings.window_width)
+        .default_height(settings.window_height)
+        .show_menubar(true)
         .build();
 
-    // Connect to "clicked" signal of test button.
-    test_button.connect_clicked(|test_button| {
-        test_button.set_label("Test button pressed!");
-    });
-
-    // Return the test button.
-    test_button
+    // Present the UI and all elements.
+    window.present();
 }
