@@ -1,6 +1,7 @@
 // Steganography UI configuration and interfaces
 // to Steganography class methods.
 
+use log::{info};
 use crate::SETTINGS;
 use crate::settings::Settings;
 extern crate gtk;
@@ -10,11 +11,34 @@ use gtk::{Application, ApplicationWindow};
 
 // Function to create application UI elements.
 pub fn on_startup(app: &gtk::Application) {
+    // Create an action for an 'Open' menu item.
+    let open = gio::ActionEntry::builder("open")
+        .activate(|_, _, _| open_image())
+        .build();
+
+    // Create an action for a 'Save' menu item.
+    let save = gio::ActionEntry::builder("save")
+        .activate(|_, _, _| save_image())
+        .build();
+
+    // Create an action for an 'Embed' menu item.
+    let embed = gio::ActionEntry::builder("embed")
+        .activate(|_, _, _| embed_into_image())
+        .build();
+
+    // Create an action for a 'Preview' menu item.
+    let preview = gio::ActionEntry::builder("preview")
+        .activate(|_, _, _| preview_image())
+        .build();
+
     // Create an action for an 'About' menu item.
-    // <TODO> Create a proper about box dialog on a Help top level menu.
-    // On the same Help menu have a User Guide menu option.
-        let about = gio::ActionEntry::builder("about")
-        .activate(|_, _, _| println!("About was pressed"))
+    let about = gio::ActionEntry::builder("about")
+        .activate(|_, _, _| about_app())
+        .build();
+
+    // Create an action for a 'Help' menu item.
+    let help = gio::ActionEntry::builder("help")
+        .activate(|_, _, _| help_app())
         .build();
 
     // Create an action for an applicatioin quit menu item.
@@ -23,26 +47,54 @@ pub fn on_startup(app: &gtk::Application) {
         .build();
 
     // Add menu item actions to the application UI. 
-    app.add_action_entries([about, quit]);
+    app.add_action_entries([open, save, embed, preview, about, help, quit]);
 
-    // Create menubar selection items.
-    // <TODO> Have top level menues for File and Edit.
-    // On File menu have sub-menu items for Open and Save image functions.
-    // On the edit menu have sub-menu items for Embed and Preview image functions.
+    // Create menubar full of menu options.
     let menubar = {
         let file_menu = {
-            let about_menu_item = gio::MenuItem::new(Some("About"), Some("app.about"));
-            let quit_menu_item = gio::MenuItem::new(Some("Quit"), Some("app.quit"));
+            let open_menu_item = gio::MenuItem::new(Some("Open"), Some("app.open"));
+            let save_menu_item = gio::MenuItem::new(Some("Save"), Some("app.save"));
 
             let file_menu = gio::Menu::new();
-            file_menu.append_item(&about_menu_item);
-            file_menu.append_item(&quit_menu_item);
+            file_menu.append_item(&open_menu_item);
+            file_menu.append_item(&save_menu_item);
             file_menu
         };
 
+        let edit_menu = {
+            let embed_menu_item = gio::MenuItem::new(Some("Embed"), Some("app.embed"));
+            let preview_menu_item = gio::MenuItem::new(Some("Preview"), Some("app.preview"));
+
+            let edit_menu = gio::Menu::new();
+            edit_menu.append_item(&embed_menu_item);
+            edit_menu.append_item(&preview_menu_item);
+            edit_menu
+        };
+
+        let help_menu = {
+            let about_menu_item = gio::MenuItem::new(Some("About"), Some("app.about"));
+            let help_menu_item = gio::MenuItem::new(Some("Help"), Some("app.help"));
+
+            let help_menu = gio::Menu::new();
+            help_menu.append_item(&about_menu_item);
+            help_menu.append_item(&help_menu_item);
+            help_menu
+        };
+
+        let quit_menu = {
+            let quit_menu_item = gio::MenuItem::new(Some("Quit"), Some("app.quit"));
+
+            let quit_menu = gio::Menu::new();
+            quit_menu.append_item(&quit_menu_item);
+            quit_menu
+        };
+    
         // Create an application menubar and associate items to it.
         let menubar = gio::Menu::new();
         menubar.append_submenu(Some("File"), &file_menu);
+        menubar.append_submenu(Some("Edit"), &edit_menu);
+        menubar.append_submenu(Some("Help"), &help_menu);
+        menubar.append_submenu(Some("Quit"), &quit_menu);
         // Return menubar object.
         menubar
     };
@@ -66,4 +118,28 @@ pub fn on_activate(application: &Application) {
 
     // Present the UI and all elements.
     window.present();
+}
+
+pub fn open_image() {
+    info!("Open image menu item selected.");
+}
+
+pub fn save_image() {
+    info!("Save image menu item selected.");
+}
+
+pub fn embed_into_image() {
+    info!("Embed into image menu item selected.");
+}
+
+pub fn preview_image() {
+    info!("Preview image menu item selected.");
+}
+
+pub fn about_app() {
+    info!("About application menu item selected.");
+}
+
+pub fn help_app() {
+    info!("Application help menu item selected.");
 }
