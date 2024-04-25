@@ -4,6 +4,8 @@ use log::info;
 use log4rs;
 use gtk::prelude::*;
 use lazy_static::lazy_static;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::fs::File;
 use std::io::prelude::*;
 use std::sync::Mutex;
@@ -43,7 +45,9 @@ fn main() {
     info!("Application started, version: {}", env!("CARGO_PKG_VERSION"));
 
     // Instatiate a steganography struct.
-    let mut _img_steg = Steganography::init();
+    // Make interior shareable as need to pass to UI
+    // menu servicing functions.
+    let img_steg = Rc::new(RefCell::new(Steganography::init()));
 
     // Create a new GTK application.
     let application = gtk::Application::builder()
@@ -51,7 +55,7 @@ fn main() {
     .build();
 
     // Start up and activate UI application.
-    application.connect_startup(on_startup);
+    application.connect_startup(move |app| on_startup(app, img_steg.clone()));
     application.connect_activate(on_activate);
     application.run();
 }
