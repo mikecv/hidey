@@ -2,18 +2,30 @@
 // to Steganography class methods.
 
 use log::{info};
-use crate::SETTINGS;
-use crate::settings::Settings;
-extern crate gtk;
+use std::cell::RefCell;
+use std::rc::Rc;
 
+extern crate gtk;
 use gtk::{gio, prelude::*};
 use gtk::{Application, ApplicationWindow};
 
+use crate::SETTINGS;
+use crate::settings::Settings;
+use crate::steg::Steganography;
+
 // Function to create application UI elements.
-pub fn on_startup(app: &gtk::Application) {
+pub fn on_startup(app: &gtk::Application, img_steg: Rc<RefCell<Steganography>>) {
+    // Create menubar.
+    let menubar = gio::Menu::new();
+
+    // Clone _img_steg to pass into menu item closures.
+    let img_steg_clone = img_steg.clone();
+
     // Create an action for an 'Open' menu item.
+    // Include reference to steg instance so that menu item
+    // can trigger methods.
     let open = gio::ActionEntry::builder("open")
-        .activate(|_, _, _| open_image())
+        .activate(move |_, _, _| open_image(&img_steg_clone))
         .build();
 
     // Create an action for a 'Save' menu item.
@@ -90,11 +102,11 @@ pub fn on_startup(app: &gtk::Application) {
         };
     
         // Create an application menubar and associate items to it.
-        let menubar = gio::Menu::new();
         menubar.append_submenu(Some("File"), &file_menu);
         menubar.append_submenu(Some("Edit"), &edit_menu);
         menubar.append_submenu(Some("Help"), &help_menu);
         menubar.append_submenu(Some("Quit"), &quit_menu);
+
         // Return menubar object.
         menubar
     };
@@ -120,8 +132,20 @@ pub fn on_activate(application: &Application) {
     window.present();
 }
 
-pub fn open_image() {
+pub fn open_image(_img_steg: &Rc<RefCell<Steganography>>) {
     info!("Open image menu item selected.");
+
+    // Borrow the inner value mutably and obtain a mutable reference.
+    // This will allow access to the fields and methods of Steganography.
+    let mut img_steg_refmut = _img_steg.borrow_mut();
+    let img_steg = &mut *img_steg_refmut;
+
+    // <TODO> Remove these tests of access to Steganography variables and methods.
+    info!("Steg test - read image to open variable: {}", img_steg.img_to_proc);
+    img_steg.img_to_proc = true;
+    info!("Steg test - set image to open variable: {}", img_steg.img_to_proc);
+    // Call initialise parameters method.
+    img_steg.init_image_params();
 }
 
 pub fn save_image() {
