@@ -141,12 +141,8 @@ pub fn open_image(_img_steg: &Rc<RefCell<Steganography>>) {
     let img_steg = &mut *img_steg_refmut;
 
     // <TODO> Remove these tests of access to Steganography variables and methods.
-    info!("Steg test - read image to open variable: {}", img_steg.img_to_proc);
-    img_steg.img_to_proc = true;
-    info!("Steg test - set image to open variable: {}", img_steg.img_to_proc);
-    // Call initialise parameters method.
-    img_steg.init_image_params();
-}
+    img_steg.init_embed_params();
+    img_steg.load_new_file("volleyballs-2.png".to_string());}
 
 pub fn save_image() {
     info!("Save image menu item selected.");
