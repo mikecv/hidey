@@ -154,7 +154,7 @@ pub fn preview_image() {
 }
 
 // Include the About logo file.
-static LOGO_SVG: &[u8] = include_bytes!("../target/debug/static/gtk-rs.svg");
+static LOGO_PNG: &[u8] = include_bytes!("../target/debug/static/hidey-ho.png");
 
 pub fn about_app() {
     info!("About application menu item selected.");
@@ -163,7 +163,7 @@ pub fn about_app() {
     let settings_lock = SETTINGS.lock().unwrap();
     let settings: &Settings = &*settings_lock;
 
-    let bytes = glib::Bytes::from_static(LOGO_SVG);
+    let bytes = glib::Bytes::from_static(LOGO_PNG);
     let logo = gdk::Texture::from_bytes(&bytes).expect("Failed to load About logo");
     let dialog = gtk::AboutDialog::builder()
         .program_name(settings.program_name.clone())
