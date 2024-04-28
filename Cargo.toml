@@ -16,3 +16,7 @@ lazy_static = "1.4"
 glib = "^0"
 gtk = { version = "0.8.1", package = "gtk4", features = ["v4_6"] }
 gio = "^0.9"
+static-files = "0.2"
+
+[build-dependencies]
+static-files = "0.2"

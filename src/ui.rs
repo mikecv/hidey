@@ -5,6 +5,8 @@ use log::{info};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use gtk::gdk;
+use gtk::glib;
 extern crate gtk;
 use gtk::{gio, prelude::*};
 use gtk::{Application, ApplicationWindow};
@@ -66,10 +68,12 @@ pub fn on_startup(app: &gtk::Application, img_steg: Rc<RefCell<Steganography>>) 
         let file_menu = {
             let open_menu_item = gio::MenuItem::new(Some("Open"), Some("app.open"));
             let save_menu_item = gio::MenuItem::new(Some("Save"), Some("app.save"));
+            let quit_menu_item = gio::MenuItem::new(Some("Quit"), Some("app.quit"));
 
             let file_menu = gio::Menu::new();
             file_menu.append_item(&open_menu_item);
             file_menu.append_item(&save_menu_item);
+            file_menu.append_item(&quit_menu_item);
             file_menu
         };
 
@@ -92,24 +96,16 @@ pub fn on_startup(app: &gtk::Application, img_steg: Rc<RefCell<Steganography>>) 
             help_menu.append_item(&help_menu_item);
             help_menu
         };
-
-        let quit_menu = {
-            let quit_menu_item = gio::MenuItem::new(Some("Quit"), Some("app.quit"));
-
-            let quit_menu = gio::Menu::new();
-            quit_menu.append_item(&quit_menu_item);
-            quit_menu
-        };
     
         // Create an application menubar and associate items to it.
         menubar.append_submenu(Some("File"), &file_menu);
         menubar.append_submenu(Some("Edit"), &edit_menu);
         menubar.append_submenu(Some("Help"), &help_menu);
-        menubar.append_submenu(Some("Quit"), &quit_menu);
 
         // Return menubar object.
         menubar
     };
+
     // Associate menubar with the application UI.
     app.set_menubar(Some(&menubar));
 }
@@ -120,6 +116,7 @@ pub fn on_activate(application: &Application) {
     let settings_lock = SETTINGS.lock().unwrap();
     let settings: &Settings = &*settings_lock;
 
+    // Create window container.
     let window = ApplicationWindow::builder()
         .application(application)
         .title("Hidey-Ho")
@@ -156,8 +153,28 @@ pub fn preview_image() {
     info!("Preview image menu item selected.");
 }
 
+// Include the About logo file.
+static LOGO_SVG: &[u8] = include_bytes!("../target/debug/static/gtk-rs.svg");
+
 pub fn about_app() {
     info!("About application menu item selected.");
+
+    // Access lazy global settings from main.
+    let settings_lock = SETTINGS.lock().unwrap();
+    let settings: &Settings = &*settings_lock;
+
+    let bytes = glib::Bytes::from_static(LOGO_SVG);
+    let logo = gdk::Texture::from_bytes(&bytes).expect("Failed to load About logo");
+    let dialog = gtk::AboutDialog::builder()
+        .program_name(settings.program_name.clone())
+        .version(settings.program_ver.clone())
+        .license_type(gtk::License::Lgpl30)
+        .authors(settings.program_devs.clone())
+        .logo(&logo)
+        .build();
+
+    dialog.set_modal(false);
+    dialog.present();
 }
 
 pub fn help_app() {
