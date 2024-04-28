@@ -3,6 +3,7 @@
 
 # Ignore target builds.
 /target
+!/target/debug/static
 
 # Ignore log files.
 /logs
